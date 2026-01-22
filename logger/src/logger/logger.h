@@ -34,7 +34,6 @@ struct Color {
     }
 };
 
-//  Color palette
 namespace LogColors {
     inline constexpr Color Timestamp = Color::FromHex(0x8C8C8C);
     inline constexpr Color Info = Color::FromHex(0x1A8CFF);
@@ -77,9 +76,11 @@ private:
             default:                return LogColors::Default;
         }
     }
-    [[nodiscard]] static int GetConsoleWidth() noexcept {
+    static int GetConsoleWidth() noexcept {
+        if (!s_HandleConsole || s_HandleConsole == INVALID_HANDLE_VALUE) return 80;
+
         CONSOLE_SCREEN_BUFFER_INFO csbi;
-        if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
+        if (GetConsoleScreenBufferInfo(s_HandleConsole, &csbi)) {
             return csbi.srWindow.Right - csbi.srWindow.Left + 1;
         }
         return 80;
@@ -98,15 +99,39 @@ private:
     }
 
 public:
+    static void CreateConsole() {
+        if (AllocConsole()) {
+            Initialize();
+        }
+        else if (GetConsoleWindow() != NULL) {
+            Initialize();
+        }
+    }
+
     static void Initialize() noexcept {
         if (s_initialized) [[likely]] return;
 
-        s_HandleConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+        s_HandleConsole = CreateFileA(
+            "CONOUT$",
+            GENERIC_READ | GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            NULL, OPEN_EXISTING, 0, NULL
+        );
+
+
+        SetConsoleTitleA("[CONSOLE DEBUG LOGGER] | Created by j2cks");
         SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+
+        FILE* pFile = nullptr;
+        freopen_s(&pFile, "CONOUT$", "w", stdout);
+        freopen_s(&pFile, "CONOUT$", "w", stderr);
+        freopen_s(&pFile, "CONIN$", "r", stdin);
 
         if (DWORD mode = 0; GetConsoleMode(s_HandleConsole, &mode)) {
             SetConsoleMode(s_HandleConsole, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
         }
+
         s_initialized = true;
     }
 
@@ -160,16 +185,17 @@ public:
         if (!s_initialized) [[unlikely]] Initialize();
 
         const int width = GetConsoleWidth();
-        std::print("{}", LogColors::Separator.ToAnsi());
 
+        std::string line;
+        line.reserve(width * 3);
         for (int i = 0; i < width; ++i) {
-            std::print("\xE2\x94\x80"); //  Unicode '─' (UTF-8 encoded)
+            line.append("\xE2\x94\x80");
         }
 
-        std::println("{}", s_ResetSeq);
+        std::println("{}{}{}", LogColors::Separator.ToAnsi(), line, s_ResetSeq);
     }
     static void NewLine() noexcept {
         std::println("");
     }
 };
-ConsoleLogger g_Logger;
+inline ConsoleLogger g_Logger;
