@@ -77,26 +77,26 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>..build\debug\win32\</OutDir>
-    <IntDir>..build\debug\win32\intermediates\</IntDir>
+    <OutDir>..\build\debug\win32\</OutDir>
+    <IntDir>..\build\debug\win32\intermediates\</IntDir>
     <TargetName>logger</TargetName>
     <IncludePath>src/;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>..build\release\win32\</OutDir>
-    <IntDir>..build\release\win32\intermediates\</IntDir>
+    <OutDir>..\build\release\win32\</OutDir>
+    <IntDir>..\build\release\win32\intermediates\</IntDir>
     <TargetName>logger</TargetName>
     <IncludePath>src/;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>..build\debug\win64\</OutDir>
-    <IntDir>..build\debug\win64\intermediates\</IntDir>
+    <OutDir>..\build\debug\win64\</OutDir>
+    <IntDir>..\build\debug\win64\intermediates\</IntDir>
     <TargetName>logger</TargetName>
     <IncludePath>src/;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>..build\release\win64\</OutDir>
-    <IntDir>..build\release\win64\intermediates\</IntDir>
+    <OutDir>..\build\release\win64\</OutDir>
+    <IntDir>..\build\release\win64\intermediates\</IntDir>
     <TargetName>logger</TargetName>
     <IncludePath>src/;$(IncludePath)</IncludePath>
   </PropertyGroup>

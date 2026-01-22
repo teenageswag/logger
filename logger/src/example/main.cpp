@@ -3,7 +3,6 @@
 #include "logger/logger.h"
 
 int main() {
-
 	g_Logger.Initialize();
 
 	g_Logger.cl_Info("Hello from Info {}");
