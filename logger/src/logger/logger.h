@@ -47,7 +47,7 @@ namespace LogColors {
 
 class ConsoleLogger {
 private:
-    static inline HANDLE s_hConsole = nullptr;
+    static inline HANDLE s_HandleConsole = nullptr;
     static inline bool s_initialized = false;
     static constexpr std::string_view s_ResetSeq = "\x1b[0m";
 
@@ -101,60 +101,59 @@ public:
     static void Initialize() noexcept {
         if (s_initialized) [[likely]] return;
 
-        s_hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+        s_HandleConsole = GetStdHandle(STD_OUTPUT_HANDLE);
         SetConsoleOutputCP(CP_UTF8);
 
-        if (DWORD mode = 0; GetConsoleMode(s_hConsole, &mode)) {
-            SetConsoleMode(s_hConsole, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+        if (DWORD mode = 0; GetConsoleMode(s_HandleConsole, &mode)) {
+            SetConsoleMode(s_HandleConsole, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
         }
         s_initialized = true;
     }
 
+    //  =====Console logging=====
     //  Basic logging
-    static void Info(std::string_view msg) { LogImpl(LogLevel::Info, msg); }
-    static void Warn(std::string_view msg) { LogImpl(LogLevel::Warn, msg); }
-    static void Error(std::string_view msg) { LogImpl(LogLevel::Error, msg); }
-    static void Success(std::string_view msg) { LogImpl(LogLevel::Success, msg); }
-
+    static void cl_Info(std::string_view msg) { LogImpl(LogLevel::Info, msg); }
+    static void cl_Warn(std::string_view msg) { LogImpl(LogLevel::Warn, msg); }
+    static void cl_Error(std::string_view msg) { LogImpl(LogLevel::Error, msg); }
+    static void cl_Success(std::string_view msg) { LogImpl(LogLevel::Success, msg); }
     //  Formatted logging
     template<typename... Args>
-    static void Info(std::format_string<Args...> fmt, Args&&... args) {
+    static void cl_Info(std::format_string<Args...> fmt, Args&&... args) {
         LogImpl(LogLevel::Info, std::format(fmt, std::forward<Args>(args)...));
     }
-
     template<typename... Args>
-    static void Warn(std::format_string<Args...> fmt, Args&&... args) {
+    static void cl_Warn(std::format_string<Args...> fmt, Args&&... args) {
         LogImpl(LogLevel::Warn, std::format(fmt, std::forward<Args>(args)...));
     }
-
     template<typename... Args>
-    static void Error(std::format_string<Args...> fmt, Args&&... args) {
+    static void cl_Error(std::format_string<Args...> fmt, Args&&... args) {
         LogImpl(LogLevel::Error, std::format(fmt, std::forward<Args>(args)...));
     }
-
     template<typename... Args>
-    static void Success(std::format_string<Args...> fmt, Args&&... args) {
+    static void cl_Success(std::format_string<Args...> fmt, Args&&... args) {
         LogImpl(LogLevel::Success, std::format(fmt, std::forward<Args>(args)...));
     }
 
-    template<typename... Args>
-    static void Debug(std::format_string<Args...> fmt, Args&&... args) {
-        LogImpl(LogLevel::Debug, std::format(fmt, std::forward<Args>(args)...));
-    }
 
-    //  Utilities
+    //  =====File logging=====
+    //  Basic logging
+
+    //  Formatted logging
+    
+
+    //  =====Utilities=====
     static void Clear() noexcept {
-        if (!s_hConsole) [[unlikely]] return;
+        if (!s_HandleConsole) [[unlikely]] return;
 
         CONSOLE_SCREEN_BUFFER_INFO csbi;
         COORD topLeft = { 0, 0 };
 
-        if (GetConsoleScreenBufferInfo(s_hConsole, &csbi)) {
+        if (GetConsoleScreenBufferInfo(s_HandleConsole, &csbi)) {
             DWORD consoleSize = csbi.dwSize.X * csbi.dwSize.Y;
             DWORD written;
-            FillConsoleOutputCharacterW(s_hConsole, L' ', consoleSize, topLeft, &written);
-            FillConsoleOutputAttribute(s_hConsole, csbi.wAttributes, consoleSize, topLeft, &written);
-            SetConsoleCursorPosition(s_hConsole, topLeft);
+            FillConsoleOutputCharacterW(s_HandleConsole, L' ', consoleSize, topLeft, &written);
+            FillConsoleOutputAttribute(s_HandleConsole, csbi.wAttributes, consoleSize, topLeft, &written);
+            SetConsoleCursorPosition(s_HandleConsole, topLeft);
         }
     }
     static void Separator() {
