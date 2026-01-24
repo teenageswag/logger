@@ -217,4 +217,4 @@ public:
   }
   static void NewLine() noexcept { std::println(""); }
 };
-inline ConsoleLogger g_Logger;
+inline ConsoleLogger g_ConsoleLogger;

@@ -3,21 +3,21 @@
 #include "logger/logger.h"
 
 int main() {
-	g_Logger.Info("Это обычный INFO {}");
-	g_Logger.Info("А это {}", "форматированный INFO");
-	g_Logger.Separator();
+	g_ConsoleLogger.Info("Это обычный INFO {}");
+	g_ConsoleLogger.Info("А это {}", "форматированный INFO");
+	g_ConsoleLogger.Separator();
 
-	g_Logger.Warn("Это обычный WARN {}");
-	g_Logger.Warn("А это {}", "форматированный WARN");
-	g_Logger.Separator();
+	g_ConsoleLogger.Warn("Это обычный WARN {}");
+	g_ConsoleLogger.Warn("А это {}", "форматированный WARN");
+	g_ConsoleLogger.Separator();
 
-	g_Logger.Error("Это обычный ERROR {}");
-	g_Logger.Error("А это {}", "форматированный ERROR");
-	g_Logger.Separator();
+	g_ConsoleLogger.Error("Это обычный ERROR {}");
+	g_ConsoleLogger.Error("А это {}", "форматированный ERROR");
+	g_ConsoleLogger.Separator();
 
-	g_Logger.Success("Это обычный SUCCESS {}");
-	g_Logger.Success("А это {}", "форматированный SUCCESS");
-	g_Logger.Separator();
+	g_ConsoleLogger.Success("Это обычный SUCCESS {}");
+	g_ConsoleLogger.Success("А это {}", "форматированный SUCCESS");
+	g_ConsoleLogger.Separator();
 
 	std::cin.get();
 
