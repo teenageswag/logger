@@ -3,20 +3,20 @@
 #include "logger/logger.h"
 
 int main() {
-	g_Logger.cl_Info("Hello from Info {}");
-	g_Logger.cl_Info("Hello from {}", "formated Info");
+	g_Logger.Info("Это обычный INFO {}");
+	g_Logger.Info("А это {}", "форматированный INFO");
 	g_Logger.Separator();
 
-	g_Logger.cl_Warn("Hello from Warn {}");
-	g_Logger.cl_Warn("Hello from {}", "formated Warn");
+	g_Logger.Warn("Это обычный WARN {}");
+	g_Logger.Warn("А это {}", "форматированный WARN");
 	g_Logger.Separator();
 
-	g_Logger.cl_Error("Hello from Error {}");
-	g_Logger.cl_Error("Hello from {}", "formated Error");
+	g_Logger.Error("Это обычный ERROR {}");
+	g_Logger.Error("А это {}", "форматированный ERROR");
 	g_Logger.Separator();
 
-	g_Logger.cl_Success("Hello from Success {}");
-	g_Logger.cl_Success("Hello from {}", "formated Success");
+	g_Logger.Success("Это обычный SUCCESS {}");
+	g_Logger.Success("А это {}", "форматированный SUCCESS");
 	g_Logger.Separator();
 
 	std::cin.get();

@@ -157,36 +157,31 @@ public:
         DestroyConsole();
     }
 
-  //  =====Console logging=====
   //  Basic logging
-  static void cl_Info(std::string_view msg) { LogImpl(LogLevel::Info, msg); }
-  static void cl_Warn(std::string_view msg) { LogImpl(LogLevel::Warn, msg); }
-  static void cl_Error(std::string_view msg) { LogImpl(LogLevel::Error, msg); }
-  static void cl_Success(std::string_view msg) {
+  static void Info(std::string_view msg) { LogImpl(LogLevel::Info, msg); }
+  static void Warn(std::string_view msg) { LogImpl(LogLevel::Warn, msg); }
+  static void Error(std::string_view msg) { LogImpl(LogLevel::Error, msg); }
+  static void Success(std::string_view msg) {
     LogImpl(LogLevel::Success, msg);
   }
+
   //  Formatted logging
   template <typename... Args>
-  static void cl_Info(std::format_string<Args...> fmt, Args &&...args) {
+  static void Info(std::format_string<Args...> fmt, Args &&...args) {
     LogImpl(LogLevel::Info, std::format(fmt, std::forward<Args>(args)...));
   }
   template <typename... Args>
-  static void cl_Warn(std::format_string<Args...> fmt, Args &&...args) {
+  static void Warn(std::format_string<Args...> fmt, Args &&...args) {
     LogImpl(LogLevel::Warn, std::format(fmt, std::forward<Args>(args)...));
   }
   template <typename... Args>
-  static void cl_Error(std::format_string<Args...> fmt, Args &&...args) {
+  static void Error(std::format_string<Args...> fmt, Args &&...args) {
     LogImpl(LogLevel::Error, std::format(fmt, std::forward<Args>(args)...));
   }
   template <typename... Args>
-  static void cl_Success(std::format_string<Args...> fmt, Args &&...args) {
+  static void Success(std::format_string<Args...> fmt, Args &&...args) {
     LogImpl(LogLevel::Success, std::format(fmt, std::forward<Args>(args)...));
   }
-
-  //  =====File logging=====
-  //  Basic logging
-
-  //  Formatted logging
 
   //  =====Utilities=====
   static void Clear() noexcept {
