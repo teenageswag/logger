@@ -238,7 +238,7 @@ private:
     std::filesystem::path exePath(buffer);
     std::filesystem::path logPath = exePath.parent_path() / "log.txt";
 
-    s_LogFile.open(logPath, std::ios::app);
+    s_LogFile.open(logPath, std::ios::out | std::ios::trunc);
     s_initialized = true;
   }
 
