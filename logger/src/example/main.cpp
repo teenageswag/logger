@@ -3,23 +3,35 @@
 #include "logger/logger.h"
 
 int main() {
-	g_ConsoleLogger.Info("Это обычный INFO {}");
-	g_ConsoleLogger.Info("А это {}", "форматированный INFO");
+
+	g_ConsoleLogger.Info("Вывод в консоль");
+	g_ConsoleLogger.Info("{} вывод в консоль", "Форматированный");
 	g_ConsoleLogger.Separator();
 
-	g_ConsoleLogger.Warn("Это обычный WARN {}");
-	g_ConsoleLogger.Warn("А это {}", "форматированный WARN");
+	g_ConsoleLogger.Warn("Вывод в консоль");
+	g_ConsoleLogger.Warn("{} вывод в консоль", "Форматированный");
 	g_ConsoleLogger.Separator();
 
-	g_ConsoleLogger.Error("Это обычный ERROR {}");
-	g_ConsoleLogger.Error("А это {}", "форматированный ERROR");
+	g_ConsoleLogger.Error("Вывод в консоль");
+	g_ConsoleLogger.Error("{} вывод в консоль", "Форматированный");
 	g_ConsoleLogger.Separator();
 
-	g_ConsoleLogger.Success("Это обычный SUCCESS {}");
-	g_ConsoleLogger.Success("А это {}", "форматированный SUCCESS");
+	g_ConsoleLogger.Success("Вывод в консоль");
+	g_ConsoleLogger.Success("{} вывод в консоль", "Форматированный");
 	g_ConsoleLogger.Separator();
+
+	g_FileLogger.Info("Вывод в файл");
+	g_FileLogger.Info("{} вывод в файл", "Форматированный");
+
+	g_FileLogger.Warn("Вывод в файл");
+	g_FileLogger.Warn("{} вывод в файл", "Форматированный");
+
+	g_FileLogger.Error("Вывод в файл");
+	g_FileLogger.Error("{} вывод в файл", "Форматированный");
+
+	g_FileLogger.Success("Вывод в файл");
+	g_FileLogger.Success("{} вывод в файл", "Форматированный");
 
 	std::cin.get();
-
 	return 0;
 }
