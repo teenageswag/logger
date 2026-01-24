@@ -183,7 +183,7 @@ public:
     LogImpl(LogLevel::Success, std::format(fmt, std::forward<Args>(args)...));
   }
 
-  //  ======Utilities======
+  //  ======Console Utilities======
   static void Clear() noexcept {
     if (!s_HandleConsole) [[unlikely]]
       return;
@@ -290,6 +290,23 @@ public:
   template <typename... Args>
   static void Success(std::format_string<Args...> fmt, Args &&...args) {
     LogImpl(LogLevel::Success, std::format(fmt, std::forward<Args>(args)...));
+  }
+
+  //  ======File Utilities======
+  static void Separator() noexcept{
+    if (!s_initialized) [[unlikely]]
+      Initialize();
+
+    if (s_LogFile.is_open()) {
+      s_LogFile << "--------------------------------------------------------------------------------\n";
+      s_LogFile.flush();
+    }
+  }
+  static void NewLine() noexcept {
+    if (s_LogFile.is_open()) {
+      s_LogFile << "\n";
+      s_LogFile.flush();
+    }
   }
 };
 
