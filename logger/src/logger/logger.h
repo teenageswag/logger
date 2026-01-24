@@ -252,8 +252,7 @@ private:
     }
     std::lock_guard lock(s_Mutex);
 
-    s_LogFile << std::format(
-        "[{}] [{}] {}\n",
+    s_LogFile << std::format("[{}] [{}] {}\n",
         LogUtils::GetTimestamp(),
         LogUtils::GetLevelPrefix(level),
         message

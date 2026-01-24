@@ -4,31 +4,37 @@
 
 int main() {
 	// Console Logger Preview
-	g_ConsoleLogger.Info("Вывод в консоль");
-	g_ConsoleLogger.Info("{} вывод в консоль", "Форматированный");
+	g_ConsoleLogger.Info("Output to the console");
+	g_ConsoleLogger.Info("{} output to the console", "Formatted");
 	g_ConsoleLogger.Separator();
-	g_ConsoleLogger.Warn("Вывод в консоль");
-	g_ConsoleLogger.Warn("{} вывод в консоль", "Форматированный");
+
+	g_ConsoleLogger.Warn("Output to the console");
+	g_ConsoleLogger.Warn("{} output to the console", "Formatted");
 	g_ConsoleLogger.Separator();
-	g_ConsoleLogger.Error("Вывод в консоль");
-	g_ConsoleLogger.Error("{} вывод в консоль", "Форматированный");
+
+	g_ConsoleLogger.Error("Output to the console");
+	g_ConsoleLogger.Error("{} output to the console", "Formatted");
 	g_ConsoleLogger.Separator();
-	g_ConsoleLogger.Success("Вывод в консоль");
-	g_ConsoleLogger.Success("{} вывод в консоль", "Форматированный");
+
+	g_ConsoleLogger.Success("Output to the console");
+	g_ConsoleLogger.Success("{} output to the console", "Formatted");
 	g_ConsoleLogger.Separator();
 
 	// File Logger Preview
-	g_FileLogger.Info("Вывод в файл");
-	g_FileLogger.Info("{} вывод в файл", "Форматированный");
+	g_FileLogger.Info("Output to the log.txt");
+	g_FileLogger.Info("{} output to the log.txt", "Formatted");
 	g_FileLogger.Separator();
-	g_FileLogger.Warn("Вывод в файл");
-	g_FileLogger.Warn("{} вывод в файл", "Форматированный");
+
+	g_FileLogger.Warn("Output to the log.txt");
+	g_FileLogger.Warn("{} output to the log.txt", "Formatted");
 	g_FileLogger.Separator();
-	g_FileLogger.Error("Вывод в файл");
-	g_FileLogger.Error("{} вывод в файл", "Форматированный");
+
+	g_FileLogger.Error("Output to the log.txt");
+	g_FileLogger.Error("{} output to the log.txt", "Formatted");
 	g_FileLogger.Separator();
-	g_FileLogger.Success("Вывод в файл");
-	g_FileLogger.Success("{} вывод в файл", "Форматированный");
+
+	g_FileLogger.Success("Output to the log.txt");
+	g_FileLogger.Success("{} output to the log.txt", "Formatted");
 	g_FileLogger.Separator();
 
 	std::cin.get();
