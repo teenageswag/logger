@@ -7,13 +7,34 @@
 #include <string>
 #include <string_view>
 #include <windows.h>
+#include <mutex>
+#include <filesystem>
+#include <fstream>
 
+//  ======Global======
 enum class LogLevel : uint8_t { Info, Warn, Error, Success };
+struct LogUtils {
+  static auto GetTimestamp() noexcept {
+    const auto time = std::chrono::floor<std::chrono::seconds>(
+        std::chrono::current_zone()->to_local(
+            std::chrono::system_clock::now()));
+    return std::format("{:%H:%M:%S}", time);
+  }
+  static constexpr std::string_view GetLevelPrefix(LogLevel level) noexcept {
+    switch (level) {
+    case LogLevel::Info:    return "INF";
+    case LogLevel::Warn:    return "WRN";
+    case LogLevel::Error:   return "ERR";
+    case LogLevel::Success: return "SUC";
+    default:                return "UNK";
+    }
+  }
+};
 
+//  ======Console Logger======
 struct Color {
   uint8_t r, g, b;
-  constexpr Color(uint8_t r = 255, uint8_t g = 255, uint8_t b = 255) noexcept
-      : r(r), g(g), b(b) {}
+  constexpr Color(uint8_t r = 255, uint8_t g = 255, uint8_t b = 255) noexcept : r(r), g(g), b(b) {}
 
   //  Convert HEX to RGB
   static constexpr Color FromHex(uint32_t hex) noexcept {
@@ -29,14 +50,15 @@ struct Color {
 };
 
 namespace LogColors {
-inline constexpr Color Timestamp = Color::FromHex(0x8C8C8C);
-inline constexpr Color Info = Color::FromHex(0x1A8CFF);
-inline constexpr Color Warn = Color::FromHex(0xFF8C1A);
-inline constexpr Color Error = Color::FromHex(0xFF1A40);
-inline constexpr Color Success = Color::FromHex(0x1AFF1A);
-inline constexpr Color Default = Color::FromHex(0xE6E6E6);
-inline constexpr Color Separator = Color::FromHex(0x8C8C8C);
-} // namespace LogColors
+    inline constexpr Color Timestamp = Color::FromHex(0x8C8C8C);
+    inline constexpr Color Info = Color::FromHex(0x1A8CFF);
+    inline constexpr Color Warn = Color::FromHex(0xFF8C1A);
+    inline constexpr Color Error = Color::FromHex(0xFF1A40);
+    inline constexpr Color Success = Color::FromHex(0x1AFF1A);
+    inline constexpr Color Default = Color::FromHex(0xE6E6E6);
+    inline constexpr Color Separator = Color::FromHex(0x8C8C8C);
+}
+
 
 class ConsoleLogger {
 private:
@@ -44,38 +66,13 @@ private:
   static inline bool s_initialized = false;
   static constexpr std::string_view s_ResetSeq = "\x1b[0m";
 
-  static auto GetTimestamp() noexcept {
-    const auto time = std::chrono::floor<std::chrono::seconds>(
-        std::chrono::current_zone()->to_local(
-            std::chrono::system_clock::now()));
-    return std::format("{:%H:%M:%S}", time);
-  }
-  static constexpr std::string_view GetLevelPrefix(LogLevel level) noexcept {
-    switch (level) {
-    case LogLevel::Info:
-      return "INF";
-    case LogLevel::Warn:
-      return "WRN";
-    case LogLevel::Error:
-      return "ERR";
-    case LogLevel::Success:
-      return "SUC";
-    default:
-      return "UNK";
-    }
-  }
   static constexpr Color GetLevelColor(LogLevel level) noexcept {
     switch (level) {
-    case LogLevel::Info:
-      return LogColors::Info;
-    case LogLevel::Warn:
-      return LogColors::Warn;
-    case LogLevel::Error:
-      return LogColors::Error;
-    case LogLevel::Success:
-      return LogColors::Success;
-    default:
-      return LogColors::Default;
+        case LogLevel::Info: return LogColors::Info;
+        case LogLevel::Warn: return LogColors::Warn;
+        case LogLevel::Error: return LogColors::Error;
+        case LogLevel::Success: return LogColors::Success;
+        default: return LogColors::Default;
     }
   }
   static int GetConsoleWidth() noexcept {
@@ -92,9 +89,12 @@ private:
     if (!s_initialized) [[unlikely]]
       Initialize();
 
-    std::print("{}[{}] {}[{}]{} {}\n", LogColors::Timestamp.ToAnsi(),
-               GetTimestamp(), GetLevelColor(level).ToAnsi(),
-               GetLevelPrefix(level), s_ResetSeq, message);
+    std::print(
+        "{}[{}] {}[{}]{} {}\n",
+        LogColors::Timestamp.ToAnsi(),
+        LogUtils::GetTimestamp(), GetLevelColor(level).ToAnsi(),
+        LogUtils::GetLevelPrefix(level), s_ResetSeq, message
+    );
   }
 
   static void Initialize() noexcept {
@@ -157,7 +157,7 @@ public:
         DestroyConsole();
     }
 
-  //  Basic logging
+    //  ======Basic Console Logger======
   static void Info(std::string_view msg) { LogImpl(LogLevel::Info, msg); }
   static void Warn(std::string_view msg) { LogImpl(LogLevel::Warn, msg); }
   static void Error(std::string_view msg) { LogImpl(LogLevel::Error, msg); }
@@ -165,7 +165,7 @@ public:
     LogImpl(LogLevel::Success, msg);
   }
 
-  //  Formatted logging
+  //  ======Formatted Console Logger======
   template <typename... Args>
   static void Info(std::format_string<Args...> fmt, Args &&...args) {
     LogImpl(LogLevel::Info, std::format(fmt, std::forward<Args>(args)...));
@@ -183,7 +183,7 @@ public:
     LogImpl(LogLevel::Success, std::format(fmt, std::forward<Args>(args)...));
   }
 
-  //  =====Utilities=====
+  //  ======Console Utilities======
   static void Clear() noexcept {
     if (!s_HandleConsole) [[unlikely]]
       return;
@@ -217,4 +217,97 @@ public:
   }
   static void NewLine() noexcept { std::println(""); }
 };
+
+//  ======File Logger======
+class FileLogger {
+private:
+  static inline std::ofstream s_LogFile;
+  static inline bool s_initialized = false;
+  static inline std::mutex s_Mutex;
+
+  static void Initialize() {
+    if (s_initialized)
+      return;
+
+    std::lock_guard lock(s_Mutex);
+    if (s_initialized)
+      return;
+
+    char buffer[MAX_PATH];
+    GetModuleFileNameA(NULL, buffer, MAX_PATH);
+    std::filesystem::path exePath(buffer);
+    std::filesystem::path logPath = exePath.parent_path() / "log.txt";
+
+    s_LogFile.open(logPath, std::ios::out | std::ios::trunc);
+    s_initialized = true;
+  }
+
+  static void LogImpl(LogLevel level, std::string_view message) {
+    if (!s_initialized) [[unlikely]]
+      Initialize();
+
+    if (!s_LogFile.is_open()) {
+      ConsoleLogger::Error("Failed to open log file");
+      return;
+    }
+    std::lock_guard lock(s_Mutex);
+
+    s_LogFile << std::format("[{}] [{}] {}\n",
+        LogUtils::GetTimestamp(),
+        LogUtils::GetLevelPrefix(level),
+        message
+    );
+
+    s_LogFile.flush();
+  }
+
+public:
+  FileLogger() { Initialize(); }
+  ~FileLogger() {
+      if (s_LogFile.is_open()) s_LogFile.close();
+  }
+
+  //  ======Basic File Logger======
+  static void Info(std::string_view msg) { LogImpl(LogLevel::Info, msg); }
+  static void Warn(std::string_view msg) { LogImpl(LogLevel::Warn, msg); }
+  static void Error(std::string_view msg) { LogImpl(LogLevel::Error, msg); }
+  static void Success(std::string_view msg) { LogImpl(LogLevel::Success, msg); }
+
+  //  ======Formatted File Logger======
+  template <typename... Args>
+  static void Info(std::format_string<Args...> fmt, Args &&...args) {
+    LogImpl(LogLevel::Info, std::format(fmt, std::forward<Args>(args)...));
+  }
+  template <typename... Args>
+  static void Warn(std::format_string<Args...> fmt, Args &&...args) {
+    LogImpl(LogLevel::Warn, std::format(fmt, std::forward<Args>(args)...));
+  }
+  template <typename... Args>
+  static void Error(std::format_string<Args...> fmt, Args &&...args) {
+    LogImpl(LogLevel::Error, std::format(fmt, std::forward<Args>(args)...));
+  }
+  template <typename... Args>
+  static void Success(std::format_string<Args...> fmt, Args &&...args) {
+    LogImpl(LogLevel::Success, std::format(fmt, std::forward<Args>(args)...));
+  }
+
+  //  ======File Utilities======
+  static void Separator() noexcept{
+    if (!s_initialized) [[unlikely]]
+      Initialize();
+
+    if (s_LogFile.is_open()) {
+      s_LogFile << "--------------------------------------------------------------------------------\n";
+      s_LogFile.flush();
+    }
+  }
+  static void NewLine() noexcept {
+    if (s_LogFile.is_open()) {
+      s_LogFile << "\n";
+      s_LogFile.flush();
+    }
+  }
+};
+
 inline ConsoleLogger g_ConsoleLogger;
+inline FileLogger g_FileLogger;
