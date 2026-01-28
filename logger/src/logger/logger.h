@@ -2,9 +2,11 @@
 #include <filesystem>
 #include <fstream>
 #include <mutex>
-#include <windows.h>
 #include <print>
+#include <windows.h>
 
+#define CONSOLE_LOGGER_ENABLE // Comment to disable console logger
+#define FILE_LOGGER_ENABLE    // Comment to disable file logger
 
 //  ======Global======
 enum class LogLevel : uint8_t { Info, Warn, Error, Success };

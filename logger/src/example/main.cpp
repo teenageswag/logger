@@ -1,7 +1,5 @@
 #include <iostream>
 
-#define CONSOLE_LOGGER_ENABLE
-#define FILE_LOGGER_ENABLE
 #include "logger/logger.h"
 
 int main() {
