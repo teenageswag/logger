@@ -15,9 +15,29 @@ A high-performance, single-header C++23 logging library for Windows. Designed fo
 
 Simply drop `logger.h` into your project and `#include` it. No separate `.cpp` files or dependencies required.
 
+## How to Work With Console Logs
+
+If your application is a **Console Application**, the logger will automatically detect the existing console window and log to it by default. You do not need to call any initialization functions.
+
+However, if your application is a **GUI Application** (or a DLL without a host console) and you want to see logs, you must explicitly initialize a console. The logger will automatically allocate (`AllocConsole`) a new console window and redirect standard streams to it.
+
+To do this, call `log::init_console()` at the start of your program. This function optionally takes a `ConsoleConfig` object to customize the console window (e.g., changing the window title, setting buffer sizes, and controlling stream redirection).
+
+```cpp
+// Basic initialization
+log::init_console();
+
+// Advanced initialization with custom configuration
+log::ConsoleConfig cfg;
+cfg.title = "Window Title";
+cfg.buffer_width = 150;
+cfg.buffer_height = 40;
+log::init_console(cfg);
+```
+
 ## How to Work With File Logs
 
-By default, the logger **only writes to the console**. Log files are not created automatically to prevent cluttering your disk.
+By default, the logger **does not write to files**. Log files are not created automatically to prevent cluttering your disk.
 
 To **enable** file logging, call the `add_file_sink` function, providing a file path and a maximum file size. Once the file reaches the maximum size, it will be saved as a backup (`app.log.1`), and logging will seamlessly continue in a fresh `app.log`.
 
@@ -58,6 +78,9 @@ This threshold can be changed dynamically **while the program is running**, with
 #include "logger/logger.h"
 
 int main() {
+    // Initialize the console sink (required to see logs in the terminal)
+    log::init_console();
+
     // Enable file logging with rotation every 1 MB
     log::add_file_sink("app.log", 1 * 1024 * 1024);
 

@@ -2,6 +2,12 @@
 #include "logger/logger.h"
 
 int main() {
+    log::ConsoleConfig cfg;
+    cfg.title = "Window Title";
+    cfg.buffer_width = 150;
+    cfg.buffer_height = 40;
+    log::init_console(cfg);
+
     // Used to create a file with logs (file_name.log, size)
     log::add_file_sink("app.log", 1 * 1024 * 1024);
 
