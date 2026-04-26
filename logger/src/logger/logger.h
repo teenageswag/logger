@@ -1,312 +1,430 @@
 #pragma once
+
+#include <chrono>
+#include <condition_variable>
 #include <filesystem>
+#include <format>
 #include <fstream>
+#include <memory>
 #include <mutex>
-#include <print>
+#include <source_location>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <type_traits>
+#include <vector>
+
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
+#undef ERROR
+#endif
 
-#define CONSOLE_LOGGER_ENABLE // Comment to disable console logger
-#define FILE_LOGGER_ENABLE    // Comment to disable file logger
+namespace log_detail {
 
-//  ======Global======
-enum class LogLevel : uint8_t { Info, Warn, Error, Success };
-struct LogUtils {
-  static auto GetTimestamp() noexcept {
-    const auto time = std::chrono::floor<std::chrono::seconds>(
-        std::chrono::current_zone()->to_local(
-            std::chrono::system_clock::now()));
-    return std::format("{:%H:%M:%S}", time);
-  }
-  static constexpr std::string_view GetLevelPrefix(LogLevel level) noexcept {
-    switch (level) {
-    case LogLevel::Info:
-      return "INF";
-    case LogLevel::Warn:
-      return "WRN";
-    case LogLevel::Error:
-      return "ERR";
-    case LogLevel::Success:
-      return "SUC";
-    default:
-      return "UNK";
-    }
-  }
+enum class Level : uint8_t { TRACE, DEBUG, INFO, WARN, ERROR };
+
+struct LogMessage {
+    Level level;
+    std::chrono::system_clock::time_point time;
+    uint32_t thread_id;
+    std::source_location loc;
+    std::string text;
 };
 
-//  ======Console Logger======
-struct Color {
-  uint8_t r, g, b;
-  constexpr Color(uint8_t r = 255, uint8_t g = 255, uint8_t b = 255) noexcept
-      : r(r), g(g), b(b) {}
-
-  //  Convert HEX to RGB
-  static constexpr Color FromHex(uint32_t hex) noexcept {
-    return Color(static_cast<uint8_t>((hex >> 16) & 0xFF),
-                 static_cast<uint8_t>((hex >> 8) & 0xFF),
-                 static_cast<uint8_t>(hex & 0xFF));
-  }
-  //  Get ANSI escape sequence for this color
-  [[nodiscard]] auto ToAnsi() const noexcept {
-    return std::format("\x1b[38;2;{};{};{}m", r, g, b);
-  }
+class Sink {
+public:
+    virtual ~Sink() = default;
+    virtual void write(const LogMessage& msg) = 0;
+    virtual void flush() = 0;
 };
 
-namespace LogColors {
-inline constexpr Color Timestamp = Color::FromHex(0x8C8C8C);
-inline constexpr Color Info = Color::FromHex(0x1A8CFF);
-inline constexpr Color Warn = Color::FromHex(0xFF8C1A);
-inline constexpr Color Error = Color::FromHex(0xFF1A40);
-inline constexpr Color Success = Color::FromHex(0x1AFF1A);
-inline constexpr Color Default = Color::FromHex(0xE6E6E6);
-inline constexpr Color Separator = Color::FromHex(0x8C8C8C);
-} // namespace LogColors
-
-#ifdef CONSOLE_LOGGER_ENABLE
-class ConsoleLogger {
-private:
-  static inline HANDLE s_HandleConsole = nullptr;
-  static inline bool s_initialized = false;
-  static constexpr std::string_view s_ResetSeq = "\x1b[0m";
-
-  static constexpr Color GetLevelColor(LogLevel level) noexcept {
+inline std::string_view level_to_string(Level level) noexcept {
     switch (level) {
-    case LogLevel::Info:
-      return LogColors::Info;
-    case LogLevel::Warn:
-      return LogColors::Warn;
-    case LogLevel::Error:
-      return LogColors::Error;
-    case LogLevel::Success:
-      return LogColors::Success;
-    default:
-      return LogColors::Default;
+        case Level::TRACE: return "TRC";
+        case Level::DEBUG: return "DBG";
+        case Level::INFO:  return "INF";
+        case Level::WARN:  return "WRN";
+        case Level::ERROR: return "ERR";
+        default:           return "UNK";
     }
-  }
-  static int GetConsoleWidth() noexcept {
-    if (!s_HandleConsole || s_HandleConsole == INVALID_HANDLE_VALUE)
-      return 80;
+}
 
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    if (GetConsoleScreenBufferInfo(s_HandleConsole, &csbi)) {
-      return csbi.srWindow.Right - csbi.srWindow.Left + 1;
+inline std::string_view level_to_color(Level level) noexcept {
+    switch (level) {
+    case Level::TRACE: return "\x1b[38;2;140;140;140m"; // #8C8C8C
+    case Level::DEBUG: return "\x1b[38;2;128;191;64m";  // #80BF40
+    case Level::INFO:  return "\x1b[38;2;51;166;204m";  // #33A6CC
+    case Level::WARN:  return "\x1b[38;2;204;191;51m";  // #CCBF33
+    case Level::ERROR: return "\x1b[38;2;204;51;64m";   // #CC3340
+    default:           return "\x1b[0m";                // Reset
     }
-    return 80;
-  }
-  static void LogImpl(LogLevel level, std::string_view message) {
-    if (!s_initialized) [[unlikely]]
-      Initialize();
+}
 
-    std::print("{}[{}] {}[{}]{} {}\n", LogColors::Timestamp.ToAnsi(),
-               LogUtils::GetTimestamp(), GetLevelColor(level).ToAnsi(),
-               LogUtils::GetLevelPrefix(level), s_ResetSeq, message);
-  }
+inline constexpr std::string_view reset_color = "\x1b[0m";
 
-  static void Initialize() noexcept {
-    if (s_initialized) [[likely]]
-      return;
+inline void get_time_info(std::chrono::system_clock::time_point tp, struct tm& tm_info) {
+    auto t_c = std::chrono::system_clock::to_time_t(tp);
+#if defined(_WIN32)
+    localtime_s(&tm_info, &t_c);
+#else
+    localtime_r(&t_c, &tm_info);
+#endif
+}
 
-    s_HandleConsole = CreateFileA("CONOUT$", GENERIC_READ | GENERIC_WRITE,
-                                  FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                  OPEN_EXISTING, 0, NULL);
-
-    SetConsoleTitleA("[CONSOLE DEBUG LOGGER] | Created by j2cks");
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
-
-    FILE *pFile = nullptr;
-    freopen_s(&pFile, "CONOUT$", "w", stdout);
-    freopen_s(&pFile, "CONOUT$", "w", stderr);
-    freopen_s(&pFile, "CONIN$", "r", stdin);
-
-    if (DWORD mode = 0; GetConsoleMode(s_HandleConsole, &mode)) {
-      SetConsoleMode(s_HandleConsole,
-                     mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+class ConsoleSink : public Sink {
+public:
+    ConsoleSink() {
+#if defined(_WIN32)
+        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (hOut != INVALID_HANDLE_VALUE) {
+            DWORD dwMode = 0;
+            if (GetConsoleMode(hOut, &dwMode)) {
+                SetConsoleMode(hOut, dwMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+            }
+        }
+        HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
+        if (hErr != INVALID_HANDLE_VALUE) {
+            DWORD dwMode = 0;
+            if (GetConsoleMode(hErr, &dwMode)) {
+                SetConsoleMode(hErr, dwMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+            }
+        }
+#endif
     }
 
-    s_initialized = true;
-  }
+    void write(const LogMessage& msg) override {
+        struct tm tm_info;
+        get_time_info(msg.time, tm_info);
+        
+        std::string_view filename = msg.loc.file_name();
+        if (auto pos = filename.find_last_of("/\\"); pos != std::string_view::npos) {
+            filename = filename.substr(pos + 1);
+        }
 
-  static void CreateConsole() {
-    if (GetConsoleWindow() != NULL) {
-      Initialize();
-    } else {
-      AllocConsole();
-      Initialize();
+        std::string final_msg = std::format(
+            "{}[{:02}:{:02}:{:02}] [{}] [{}:{}] {}{}\n",
+            level_to_color(msg.level),
+            tm_info.tm_hour, tm_info.tm_min, tm_info.tm_sec,
+            level_to_string(msg.level),
+            filename, msg.loc.line(),
+            msg.text,
+            reset_color
+        );
+        
+        if (msg.level >= Level::ERROR) {
+            std::fputs(final_msg.c_str(), stderr);
+        } else {
+            std::fputs(final_msg.c_str(), stdout);
+        }
     }
-  }
-  static void DestroyConsole() noexcept {
-    if (s_initialized) {
-      if (stdout)
-        fclose(stdout);
-      if (stderr)
-        fclose(stderr);
-      if (stdin)
-        fclose(stdin);
 
-      if (s_HandleConsole && s_HandleConsole != INVALID_HANDLE_VALUE) {
-        CloseHandle(s_HandleConsole);
-        s_HandleConsole = nullptr;
-      }
-
-      FreeConsole();
-      s_initialized = false;
+    void flush() override {
+        std::fflush(stdout);
+        std::fflush(stderr);
     }
-  }
+};
+
+class FileSink : public Sink {
+    std::filesystem::path path_;
+    std::ofstream file_;
+    size_t max_size_;
+    size_t current_size_ = 0;
+
+    void open_file() {
+        file_.open(path_, std::ios::app);
+        if (file_.is_open()) {
+            file_.seekp(0, std::ios::end);
+            current_size_ = static_cast<size_t>(file_.tellp());
+        }
+    }
+
+    void rotate() {
+        if (file_.is_open()) file_.close();
+        
+        auto rotated_path = path_;
+        rotated_path += ".1";
+        
+        std::error_code ec;
+        if (std::filesystem::exists(path_, ec)) {
+            if (std::filesystem::exists(rotated_path, ec)) {
+                std::filesystem::remove(rotated_path, ec);
+            }
+            std::filesystem::rename(path_, rotated_path, ec);
+        }
+        open_file();
+    }
 
 public:
-  ConsoleLogger() { CreateConsole(); }
-  ~ConsoleLogger() { DestroyConsole(); }
-
-  //  ======Basic Console Logger======
-  static void Info(std::string_view msg) { LogImpl(LogLevel::Info, msg); }
-  static void Warn(std::string_view msg) { LogImpl(LogLevel::Warn, msg); }
-  static void Error(std::string_view msg) { LogImpl(LogLevel::Error, msg); }
-  static void Success(std::string_view msg) { LogImpl(LogLevel::Success, msg); }
-
-  //  ======Formatted Console Logger======
-  template <typename... Args>
-  static void Info(std::format_string<Args...> fmt, Args &&...args) {
-    LogImpl(LogLevel::Info, std::format(fmt, std::forward<Args>(args)...));
-  }
-  template <typename... Args>
-  static void Warn(std::format_string<Args...> fmt, Args &&...args) {
-    LogImpl(LogLevel::Warn, std::format(fmt, std::forward<Args>(args)...));
-  }
-  template <typename... Args>
-  static void Error(std::format_string<Args...> fmt, Args &&...args) {
-    LogImpl(LogLevel::Error, std::format(fmt, std::forward<Args>(args)...));
-  }
-  template <typename... Args>
-  static void Success(std::format_string<Args...> fmt, Args &&...args) {
-    LogImpl(LogLevel::Success, std::format(fmt, std::forward<Args>(args)...));
-  }
-
-  //  ======Console Utilities======
-  static void Clear() noexcept {
-    if (!s_HandleConsole) [[unlikely]]
-      return;
-
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    COORD topLeft = {0, 0};
-
-    if (GetConsoleScreenBufferInfo(s_HandleConsole, &csbi)) {
-      DWORD consoleSize = csbi.dwSize.X * csbi.dwSize.Y;
-      DWORD written;
-      FillConsoleOutputCharacterW(s_HandleConsole, L' ', consoleSize, topLeft,
-                                  &written);
-      FillConsoleOutputAttribute(s_HandleConsole, csbi.wAttributes, consoleSize,
-                                 topLeft, &written);
-      SetConsoleCursorPosition(s_HandleConsole, topLeft);
-    }
-  }
-  static void Separator() {
-    if (!s_initialized) [[unlikely]]
-      Initialize();
-
-    const int width = GetConsoleWidth();
-
-    std::string line;
-    line.reserve(width * 3);
-    for (int i = 0; i < width; ++i) {
-      line.append("\xE2\x94\x80");
+    explicit FileSink(std::filesystem::path path, size_t max_size = 5 * 1024 * 1024)
+        : path_(std::move(path)), max_size_(max_size) {
+        open_file();
     }
 
-    std::println("{}{}{}", LogColors::Separator.ToAnsi(), line, s_ResetSeq);
-  }
-  static void NewLine() noexcept { std::println(""); }
+    void write(const LogMessage& msg) override {
+        if (!file_.is_open()) return;
+
+        struct tm tm_info;
+        get_time_info(msg.time, tm_info);
+
+        std::string_view filename = msg.loc.file_name();
+        if (auto pos = filename.find_last_of("/\\"); pos != std::string_view::npos) {
+            filename = filename.substr(pos + 1);
+        }
+
+        std::string formatted = std::format(
+            "[{:04}-{:02}-{:02} {:02}:{:02}:{:02}] [{}] [{}:{}] {}\n",
+            tm_info.tm_year + 1900, tm_info.tm_mon + 1, tm_info.tm_mday,
+            tm_info.tm_hour, tm_info.tm_min, tm_info.tm_sec,
+            level_to_string(msg.level),
+            filename, msg.loc.line(),
+            msg.text
+        );
+
+        if (current_size_ + formatted.size() > max_size_) {
+            rotate();
+            if (!file_.is_open()) return;
+        }
+
+        file_.write(formatted.data(), formatted.size());
+        current_size_ += formatted.size();
+    }
+
+    void flush() override {
+        if (file_.is_open()) file_.flush();
+    }
 };
-inline ConsoleLogger g_ConsoleLogger;
-#endif // #define CONSOLE_LOGGER_ENABLE
 
-//  ======File Logger======
-#ifdef FILE_LOGGER_ENABLE
-class FileLogger {
-private:
-  static inline std::ofstream s_LogFile;
-  static inline bool s_initialized = false;
-  static inline std::mutex s_Mutex;
+class Logger {
+    std::vector<std::unique_ptr<Sink>> sinks_;
+    Level min_level_ = Level::INFO;
+    std::mutex sinks_mutex_;
 
-  static void Initialize() {
-    if (s_initialized)
-      return;
+    static constexpr size_t queue_capacity = 4096;
+    std::vector<LogMessage> queue_;
+    size_t head_ = 0;
+    size_t tail_ = 0;
+    size_t count_ = 0;
 
-    std::lock_guard lock(s_Mutex);
-    if (s_initialized)
-      return;
+    std::mutex queue_mutex_;
+    std::condition_variable cv_push_;
+    std::condition_variable cv_pop_;
+    std::thread worker_;
+    bool stop_ = false;
 
-    char buffer[MAX_PATH];
-    GetModuleFileNameA(NULL, buffer, MAX_PATH);
-    std::filesystem::path exePath(buffer);
-    std::filesystem::path logPath = exePath.parent_path() / "log.txt";
-
-    s_LogFile.open(logPath, std::ios::out | std::ios::trunc);
-    s_initialized = true;
-  }
-
-  static void LogImpl(LogLevel level, std::string_view message) {
-    if (!s_initialized) [[unlikely]]
-      Initialize();
-
-    if (!s_LogFile.is_open()) {
-      ConsoleLogger::Error("Failed to open log file");
-      return;
+    Logger() : queue_(queue_capacity) {
+        sinks_.push_back(std::make_unique<ConsoleSink>());
+        worker_ = std::thread(&Logger::worker_loop, this);
     }
-    std::lock_guard lock(s_Mutex);
 
-    s_LogFile << std::format("[{}] [{}] {}\n", LogUtils::GetTimestamp(),
-                             LogUtils::GetLevelPrefix(level), message);
+    ~Logger() {
+        {
+            std::unique_lock lock(queue_mutex_);
+            stop_ = true;
+        }
+        cv_pop_.notify_one();
+        if (worker_.joinable()) worker_.join();
+        
+        flush_sinks();
+    }
 
-    s_LogFile.flush();
-  }
+    void worker_loop() {
+        std::vector<LogMessage> local_batch;
+        local_batch.reserve(256);
+
+        while (true) {
+            {
+                std::unique_lock lock(queue_mutex_);
+                cv_pop_.wait_for(lock, std::chrono::milliseconds(500), [this] {
+                    return count_ > 0 || stop_;
+                });
+
+                if (stop_ && count_ == 0) break;
+
+                while (count_ > 0 && local_batch.size() < 256) {
+                    local_batch.push_back(std::move(queue_[head_]));
+                    head_ = (head_ + 1) % queue_capacity;
+                    --count_;
+                }
+            }
+            
+            if (!local_batch.empty()) {
+                cv_push_.notify_all();
+                
+                std::lock_guard lock(sinks_mutex_);
+                bool should_flush = false;
+                for (const auto& msg : local_batch) {
+                    for (auto& sink : sinks_) {
+                        sink->write(msg);
+                    }
+                    if (msg.level >= Level::ERROR) should_flush = true;
+                }
+                if (should_flush) flush_sinks_unsafe();
+                
+                local_batch.clear();
+            } else {
+                flush_sinks();
+            }
+        }
+    }
+
+    void flush_sinks_unsafe() {
+        for (auto& sink : sinks_) sink->flush();
+    }
+
+    void flush_sinks() {
+        std::lock_guard lock(sinks_mutex_);
+        flush_sinks_unsafe();
+    }
+
+    static uint32_t get_current_thread_id() {
+        thread_local uint32_t tid = []() {
+#if defined(_WIN32)
+            return static_cast<uint32_t>(GetCurrentThreadId());
+#else
+            return static_cast<uint32_t>(std::hash<std::thread::id>{}(std::this_thread::get_id()));
+#endif
+        }();
+        return tid;
+    }
 
 public:
-  FileLogger() { Initialize(); }
-  ~FileLogger() {
-    if (s_LogFile.is_open())
-      s_LogFile.close();
-  }
-
-  //  ======Basic File Logger======
-  static void Info(std::string_view msg) { LogImpl(LogLevel::Info, msg); }
-  static void Warn(std::string_view msg) { LogImpl(LogLevel::Warn, msg); }
-  static void Error(std::string_view msg) { LogImpl(LogLevel::Error, msg); }
-  static void Success(std::string_view msg) { LogImpl(LogLevel::Success, msg); }
-
-  //  ======Formatted File Logger======
-  template <typename... Args>
-  static void Info(std::format_string<Args...> fmt, Args &&...args) {
-    LogImpl(LogLevel::Info, std::format(fmt, std::forward<Args>(args)...));
-  }
-  template <typename... Args>
-  static void Warn(std::format_string<Args...> fmt, Args &&...args) {
-    LogImpl(LogLevel::Warn, std::format(fmt, std::forward<Args>(args)...));
-  }
-  template <typename... Args>
-  static void Error(std::format_string<Args...> fmt, Args &&...args) {
-    LogImpl(LogLevel::Error, std::format(fmt, std::forward<Args>(args)...));
-  }
-  template <typename... Args>
-  static void Success(std::format_string<Args...> fmt, Args &&...args) {
-    LogImpl(LogLevel::Success, std::format(fmt, std::forward<Args>(args)...));
-  }
-
-  //  ======File Utilities======
-  static void Separator() noexcept {
-    if (!s_initialized) [[unlikely]]
-      Initialize();
-
-    if (s_LogFile.is_open()) {
-      s_LogFile << "-----------------------------------------------------------"
-                   "---------------------\n";
-      s_LogFile.flush();
+    static Logger& instance() {
+        static Logger inst;
+        return inst;
     }
-  }
-  static void NewLine() noexcept {
-    if (s_LogFile.is_open()) {
-      s_LogFile << "\n";
-      s_LogFile.flush();
+
+    Logger(const Logger&) = delete;
+    Logger& operator=(const Logger&) = delete;
+
+    void set_level(Level level) {
+        min_level_ = level;
     }
-  }
+
+    Level get_level() const {
+        return min_level_;
+    }
+
+    void add_sink(std::unique_ptr<Sink> sink) {
+        std::lock_guard lock(sinks_mutex_);
+        sinks_.push_back(std::move(sink));
+    }
+
+    void enqueue(Level level, const std::source_location& loc, std::string_view text) {
+        if (level < min_level_) return;
+
+        std::unique_lock lock(queue_mutex_);
+        cv_push_.wait(lock, [this] { return count_ < queue_capacity; });
+
+        auto& entry = queue_[tail_];
+        entry.level = level;
+        entry.time = std::chrono::system_clock::now();
+        entry.thread_id = get_current_thread_id();
+        entry.loc = loc;
+
+        entry.text.assign(text);
+
+        tail_ = (tail_ + 1) % queue_capacity;
+        ++count_;
+
+        lock.unlock();
+        cv_pop_.notify_one();
+    }
 };
-inline FileLogger g_FileLogger;
-#endif // #define FILE_LOGGER_ENABLE
+
+template <typename... Args>
+struct log_format_string {
+    std::format_string<Args...> fmt;
+    std::source_location loc;
+
+    template <typename String>
+    consteval log_format_string(const String& s, const std::source_location& l = std::source_location::current())
+        : fmt(s), loc(l) {}
+};
+
+inline void log_impl(Level level, const std::source_location& loc, std::string_view text) {
+    if (level < Logger::instance().get_level()) return;
+    Logger::instance().enqueue(level, loc, text);
+}
+
+} // namespace log_detail
+
+
+// Default compile-time active level
+#ifndef LOG_ACTIVE_LEVEL
+#define LOG_ACTIVE_LEVEL log::Level::TRACE
+#endif
+
+// We use a struct to avoid namespace conflicts with std::log / ::log
+struct log {
+    using Level = log_detail::Level;
+    using Sink = log_detail::Sink;
+
+    static void set_level(Level level) {
+        log_detail::Logger::instance().set_level(level);
+    }
+
+    static void add_file_sink(const std::filesystem::path& path, size_t max_size = 5 * 1024 * 1024) {
+        log_detail::Logger::instance().add_sink(std::make_unique<log_detail::FileSink>(path, max_size));
+    }
+
+    template <typename... Args>
+    static void trace(log_detail::log_format_string<std::type_identity_t<Args>...> fmt, Args&&... args) {
+        if constexpr (LOG_ACTIVE_LEVEL <= Level::TRACE) {
+            if (Level::TRACE < log_detail::Logger::instance().get_level()) return;
+            thread_local std::string tls_buffer;
+            tls_buffer.clear();
+            std::format_to(std::back_inserter(tls_buffer), fmt.fmt, std::forward<Args>(args)...);
+            log_detail::log_impl(Level::TRACE, fmt.loc, tls_buffer);
+        }
+    }
+
+    template <typename... Args>
+    static void debug(log_detail::log_format_string<std::type_identity_t<Args>...> fmt, Args&&... args) {
+        if constexpr (LOG_ACTIVE_LEVEL <= Level::DEBUG) {
+            if (Level::DEBUG < log_detail::Logger::instance().get_level()) return;
+            thread_local std::string tls_buffer;
+            tls_buffer.clear();
+            std::format_to(std::back_inserter(tls_buffer), fmt.fmt, std::forward<Args>(args)...);
+            log_detail::log_impl(Level::DEBUG, fmt.loc, tls_buffer);
+        }
+    }
+
+    template <typename... Args>
+    static void info(log_detail::log_format_string<std::type_identity_t<Args>...> fmt, Args&&... args) {
+        if constexpr (LOG_ACTIVE_LEVEL <= Level::INFO) {
+            if (Level::INFO < log_detail::Logger::instance().get_level()) return;
+            thread_local std::string tls_buffer;
+            tls_buffer.clear();
+            std::format_to(std::back_inserter(tls_buffer), fmt.fmt, std::forward<Args>(args)...);
+            log_detail::log_impl(Level::INFO, fmt.loc, tls_buffer);
+        }
+    }
+
+    template <typename... Args>
+    static void warn(log_detail::log_format_string<std::type_identity_t<Args>...> fmt, Args&&... args) {
+        if constexpr (LOG_ACTIVE_LEVEL <= Level::WARN) {
+            if (Level::WARN < log_detail::Logger::instance().get_level()) return;
+            thread_local std::string tls_buffer;
+            tls_buffer.clear();
+            std::format_to(std::back_inserter(tls_buffer), fmt.fmt, std::forward<Args>(args)...);
+            log_detail::log_impl(Level::WARN, fmt.loc, tls_buffer);
+        }
+    }
+
+    template <typename... Args>
+    static void error(log_detail::log_format_string<std::type_identity_t<Args>...> fmt, Args&&... args) {
+        if constexpr (LOG_ACTIVE_LEVEL <= Level::ERROR) {
+            if (Level::ERROR < log_detail::Logger::instance().get_level()) return;
+            thread_local std::string tls_buffer;
+            tls_buffer.clear();
+            std::format_to(std::back_inserter(tls_buffer), fmt.fmt, std::forward<Args>(args)...);
+            log_detail::log_impl(Level::ERROR, fmt.loc, tls_buffer);
+        }
+    }
+};

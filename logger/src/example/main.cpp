@@ -1,42 +1,42 @@
 #include <iostream>
-
 #include "logger/logger.h"
 
 int main() {
-  // Console Logger Preview
-  g_ConsoleLogger.Info("Output to the console");
-  g_ConsoleLogger.Info("{} output to the console", "Formatted");
-  g_ConsoleLogger.Separator();
+    // Used to create a file with logs (file_name.log, size)
+    log::add_file_sink("app.log", 1 * 1024 * 1024);
 
-  g_ConsoleLogger.Warn("Output to the console");
-  g_ConsoleLogger.Warn("{} output to the console", "Formatted");
-  g_ConsoleLogger.Separator();
+	// Set minimum runtime log level (by default it's TRACE, so this is optional)
+    log::set_level(log::Level::TRACE);
 
-  g_ConsoleLogger.Error("Output to the console");
-  g_ConsoleLogger.Error("{} output to the console", "Formatted");
-  g_ConsoleLogger.Separator();
+    // Basic logging
+    log::trace("This is a trace message");
+    log::debug("This is a debug message");
+    log::info("This is an info message");
+    log::warn("This is a warning message");
+    log::error("This is an error message");
 
-  g_ConsoleLogger.Success("Output to the console");
-  g_ConsoleLogger.Success("{} output to the console", "Formatted");
-  g_ConsoleLogger.Separator();
+    // Formatted logging (C++23 std::format)
+    int user_id = 42;
+    std::string user_name = "Artem";
+    log::info("User {} (ID: {}) logged in successfully.", user_name, user_id);
 
-  // File Logger Preview
-  g_FileLogger.Info("Output to the log.txt");
-  g_FileLogger.Info("{} output to the log.txt", "Formatted");
-  g_FileLogger.Separator();
+    // Multithreading demo
+    auto worker = [](int id) {
+        for (int i = 0; i < 5; ++i) {
+            log::info("Worker {} processing item {}", id, i);
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+    };
 
-  g_FileLogger.Warn("Output to the log.txt");
-  g_FileLogger.Warn("{} output to the log.txt", "Formatted");
-  g_FileLogger.Separator();
+    std::thread t1(worker, 1);
+    std::thread t2(worker, 2);
 
-  g_FileLogger.Error("Output to the log.txt");
-  g_FileLogger.Error("{} output to the log.txt", "Formatted");
-  g_FileLogger.Separator();
+    t1.join();
+    t2.join();
 
-  g_FileLogger.Success("Output to the log.txt");
-  g_FileLogger.Success("{} output to the log.txt", "Formatted");
-  g_FileLogger.Separator();
+    log::info("All workers finished!");
 
-  std::cin.get();
-  return 0;
+    std::cout << "Press Enter to exit..." << std::endl;
+    std::cin.get();
+    return 0;
 }
