@@ -20,9 +20,19 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\example\main.cpp" />
+    <ClCompile Include="src\logger\core\logger.cpp" />
+    <ClCompile Include="src\logger\sinks\console_sink.cpp" />
+    <ClCompile Include="src\logger\sinks\file_sink.cpp" />
+    <ClCompile Include="src\logger\sinks\json_sink.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\logger\logger.h" />
+    <ClInclude Include="src\logger\core\types.h" />
+    <ClInclude Include="src\logger\core\logger.h" />
+    <ClInclude Include="src\logger\sinks\sink.h" />
+    <ClInclude Include="src\logger\sinks\console_sink.h" />
+    <ClInclude Include="src\logger\sinks\file_sink.h" />
+    <ClInclude Include="src\logger\sinks\json_sink.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>

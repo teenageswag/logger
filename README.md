@@ -1,104 +1,213 @@
-# C++23 Zero-Overhead Logger
+# C++23 Async Logger
 
-A high-performance, single-header C++23 logging library for Windows. Designed for production-grade systems requiring zero-cost abstractions, thread-safety, and macro-free public APIs. It uses a background thread to process logs, ensuring your main application loop never blocks.
+A high-performance async logging library for Windows, built with modern C++23. Uses a background thread to process logs, so your main application loop never blocks.
 
 ## Features
 
-* ⚡ **Zero-Cost Compile-Time Filtering**: Logs below the configured threshold are completely compiled out with zero runtime cost.
-* 🚀 **Zero-Allocation Hot Path**: Messages are formatted into thread-local buffers, and capacity is reused in the async queue. Fixed-size messages do not allocate after the warmup phase.
-* 🧵 **Lock-Based Async Logging**: A dedicated background thread processes log entries via a bounded ring buffer.
-* 🎨 **Rich Console Sink**: Automatic ANSI color highlighting for different log levels.
-* 📁 **File Sink with Rotation**: Automatically buffers writes and flushes. Includes size-based rotation out-of-the-box.
-* 🛠️ **Modern C++23 API**: Utilizes `std::format` and `std::source_location`. No macros required for logging calls.
+* **Zero-Cost Compile-Time Filtering** -- Logs below the configured threshold are compiled out entirely.
+* **Async Non-Blocking Logging** -- Bounded ring buffer with a background worker thread. On overflow, oldest messages are dropped (never blocks the caller).
+* **Rich Console Sink** -- ANSI color highlighting, automatic Windows console detection/allocation.
+* **File Sink with Rotation** -- Size-based rotation with configurable number of backup files and periodic flushing.
+* **JSON Sink** -- JSON Lines output for log aggregation systems (ELK, Loki, etc.).
+* **Structured Logging** -- Attach key-value pairs to any log message for machine-readable context.
+* **Thread Naming** -- Register human-readable thread names that appear in log output.
+* **Modern C++23 API** -- `std::format`, `std::source_location`, `std::jthread`. No macros required.
 
 ## Installation
 
-Simply drop `logger.h` into your project and `#include` it. No separate `.cpp` files or dependencies required.
-
-## How to Work With Console Logs
-
-If your application is a **Console Application**, the logger will automatically detect the existing console window and log to it by default. You do not need to call any initialization functions.
-
-However, if your application is a **GUI Application** (or a DLL without a host console) and you want to see logs, you must explicitly initialize a console. The logger will automatically allocate (`AllocConsole`) a new console window and redirect standard streams to it.
-
-To do this, call `log::init_console()` at the start of your program. This function optionally takes a `ConsoleConfig` object to customize the console window (e.g., changing the window title, setting buffer sizes, and controlling stream redirection).
+Include the umbrella header in your project:
 
 ```cpp
-// Basic initialization
+#define LOG_ACTIVE_LEVEL log::Level::TRACE
+#include "logger/logger.h"
+```
+
+Add the source files to your build:
+
+```
+logger/src/logger/
+  logger.h              ← single include entry point
+  core/types.h
+  core/logger.h / .cpp
+  sinks/sink.h
+  sinks/console_sink.h / .cpp
+  sinks/file_sink.h / .cpp
+  sinks/json_sink.h / .cpp
+```
+
+## Console Logging
+
+Console logging works out of the box for console applications. For GUI applications (or DLLs without a host console), explicitly allocate a console:
+
+```cpp
+// Basic
 log::init_console();
 
-// Advanced initialization with custom configuration
+// Custom window title and buffer size
 log::ConsoleConfig cfg;
-cfg.title = "Window Title";
+cfg.title = "My App";
 cfg.buffer_width = 150;
 cfg.buffer_height = 40;
 log::init_console(cfg);
 ```
 
-## How to Work With File Logs
+## File Logging
 
-By default, the logger **does not write to files**. Log files are not created automatically to prevent cluttering your disk.
-
-To **enable** file logging, call the `add_file_sink` function, providing a file path and a maximum file size. Once the file reaches the maximum size, it will be saved as a backup (`app.log.1`), and logging will seamlessly continue in a fresh `app.log`.
+File logging is disabled by default. Enable it with `add_file_sink`:
 
 ```cpp
-// Enable file logging to app.log (maximum size of 5 Megabytes)
-log::add_file_sink("app.log", 5LL * 1024 * 1024 * 1024);
+// Rotate after 1 MB, keep 3 backup files (.1, .2, .3)
+log::add_file_sink("app.log", 1 * 1024 * 1024, 3);
 ```
 
-If you do not call this function, file logging will remain **disabled**. If you need multiple log files, you can call this function multiple times with different paths.
+Once the file reaches `max_size`, it is rotated to `.1` (oldest backups beyond `max_files` are deleted). Files are periodically flushed (default: every 1 second).
 
-## Runtime Log Filtering (`log::set_level`)
+## JSON Logging
 
-The logger uses a minimum threshold approach for filtering messages at runtime. The log levels are ordered by severity:
+Output logs as JSON Lines -- one JSON object per line, compatible with log aggregation tools:
 
-1. `TRACE` (Lowest severity)
-2. `DEBUG`
-3. `INFO`
-4. `WARN`
-5. `ERROR` (Highest severity)
+```cpp
+log::add_json_sink("logs.json", 5 * 1024 * 1024, 3);
+```
 
-`log::set_level(level)` establishes the minimum severity threshold for a log message to be processed. Any log message with a severity **equal to or greater than** the configured level will be written, while everything below it will be completely ignored.
+Example output:
 
-* `log::set_level(log::Level::TRACE)`: All logs from TRACE to ERROR will be recorded.
-* `log::set_level(log::Level::INFO)`: Only INFO, WARN, and ERROR logs will be recorded. TRACE and DEBUG are safely ignored.
-* `log::set_level(log::Level::ERROR)`: Only ERROR logs will be recorded.
+```json
+{"timestamp":"2026-07-06T12:00:00","level":"INF","file":"main.cpp","line":42,"thread":1234,"message":"User logged in","user_id":"42","ip":"192.168.1.1"}
+```
 
-This threshold can be changed dynamically **while the program is running**, without restarting. This allows you to run your application quietly at the `INFO` or `ERROR` level in production, but instantly drop the threshold to `TRACE` to gather highly detailed diagnostic data if a bug occurs.
+Structured kv pairs are automatically serialized as top-level JSON fields.
 
-## Quick Start (Example)
+## Structured Logging (kv pairs)
+
+Attach key-value context to any log message:
+
+```cpp
+log::info_ctx("User authenticated", "user", "Artem", "user_id", 42, "ip", "192.168.1.1");
+log::error_ctx("DB query failed", "host", "db-primary", "port", 5432, "timeout_ms", 5000);
+```
+
+Console output:
+
+```
+[12:00:00] [INF] [main.cpp:42] User authenticated {user=Artem, user_id=42, ip=192.168.1.1}
+```
+
+Available for all levels: `trace_ctx`, `debug_ctx`, `info_ctx`, `warn_ctx`, `error_ctx`.
+
+## Thread Naming
+
+Register a human-readable name for the current thread:
+
+```cpp
+log::set_thread_name("WorkerPool-1");
+```
+
+## Runtime Log Filtering
+
+Filter by severity threshold at runtime:
+
+```cpp
+log::set_level(log::Level::INFO);   // Only INFO, WARN, ERROR
+log::set_level(log::Level::TRACE);  // Everything
+log::set_level(log::Level::ERROR);  // Only errors
+```
+
+Change the threshold at any time without restarting.
+
+## Compile-Time Filtering
+
+Define `LOG_ACTIVE_LEVEL` before including the header to strip logs from the binary entirely:
+
+```cpp
+#define LOG_ACTIVE_LEVEL log::Level::INFO
+#include "logger/logger.h"
+
+// This compiles to nothing:
+log::debug("This is gone");
+// This stays:
+log::info("This remains");
+```
+
+## Overflow Behavior
+
+The ring buffer holds 4096 messages by default. When full, the **oldest** messages are dropped and a counter is incremented:
+
+```cpp
+size_t dropped = log::dropped_count();
+```
+
+This ensures the logging thread never blocks your application.
+
+## Custom Sinks
+
+Implement the `log::Sink` interface and add your own:
+
+```cpp
+class MySink : public log::Sink {
+public:
+    void write(const log_core::LogMessage &msg) override {
+        // Your custom output logic
+    }
+    void flush() override {}
+};
+
+log::instance().add_sink(std::make_unique<MySink>());
+```
+
+## Quick Start
 
 ```cpp
 #include <iostream>
 #include <thread>
 
-// Optional: define the compile-time active level (default is TRACE).
-// Logs below this threshold will not even be compiled into your binary.
 #define LOG_ACTIVE_LEVEL log::Level::TRACE
 #include "logger/logger.h"
 
 int main() {
-    // Initialize the console sink (required to see logs in the terminal)
     log::init_console();
+    log::add_file_sink("app.log", 1 * 1024 * 1024, 3);
+    log::add_json_sink("logs.json");
+    log::set_level(log::Level::TRACE);
 
-    // Enable file logging with rotation every 1 MB
-    log::add_file_sink("app.log", 1 * 1024 * 1024);
+    log::info("Application started");
 
-    // Set the runtime filter (cuts off TRACE and DEBUG)
-    log::set_level(log::Level::INFO);
+    // Formatted logging
+    int user_id = 42;
+    log::info("User {} logged in", user_id);
 
-    // This log will NOT be output (level is below INFO)
-    log::debug("This is a debug message");
+    // Structured logging
+    log::info_ctx("Request processed", "user_id", user_id, "latency_ms", 12);
 
-    // This log WILL be output
-    log::info("Application started successfully.");
+    // Thread naming + multithreading
+    log::set_thread_name("Main");
 
-    // Using advanced C++23 std::format syntax
-    int users = 42;
-    log::info("Current active users: {}", users);
+    auto worker = [](int id) {
+        log::set_thread_name("Worker-" + std::to_string(id));
+        for (int i = 0; i < 5; ++i)
+            log::info_ctx("Processing", "worker", id, "item", i);
+    };
 
-    log::error("Failed to load config: {}", "config.json");
+    std::thread t1(worker, 1);
+    std::thread t2(worker, 2);
+    t1.join();
+    t2.join();
 
+    log::info("Done (dropped: {} messages)", log::dropped_count());
     return 0;
 }
 ```
+
+## API Reference
+
+| Function | Description |
+|---|---|
+| `log::info("msg {}", arg)` | Log at INFO level with format string |
+| `log::info_ctx("msg {}", arg, {{"k","v"}})` | Log with structured kv pairs |
+| `log::set_level(level)` | Set runtime severity threshold |
+| `log::init_console(cfg)` | Initialize console sink |
+| `log::add_file_sink(path, max_size, max_files)` | Add file sink with rotation |
+| `log::add_json_sink(path, max_size, max_files)` | Add JSON Lines sink |
+| `log::set_thread_name(name)` | Register thread name for output |
+| `log::dropped_count()` | Get count of dropped messages |
+| `log::instance()` | Access Logger directly for custom sinks |
