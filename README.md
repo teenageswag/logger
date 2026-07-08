@@ -4,13 +4,15 @@ A high-performance async logging library for Windows, built with modern C++23. U
 
 ## Features
 
+* **Six Log Levels** -- TRACE, DEBUG, INFO, SUCCESS, WARN, ERROR with distinct colors.
 * **Zero-Cost Compile-Time Filtering** -- Logs below the configured threshold are compiled out entirely.
 * **Async Non-Blocking Logging** -- Bounded ring buffer with a background worker thread. On overflow, oldest messages are dropped (never blocks the caller).
-* **Rich Console Sink** -- ANSI color highlighting, automatic Windows console detection/allocation.
+* **Rich Console Sink** -- ANSI color highlighting, automatic Windows console detection/allocation, thread name display.
 * **File Sink with Rotation** -- Size-based rotation with configurable number of backup files and periodic flushing.
 * **JSON Sink** -- JSON Lines output for log aggregation systems (ELK, Loki, etc.).
 * **Structured Logging** -- Attach key-value pairs to any log message for machine-readable context.
 * **Thread Naming** -- Register human-readable thread names that appear in log output.
+* **Windows.h Compatible** -- `#include <Windows.h>` before or after the logger, no macro conflicts.
 * **Modern C++23 API** -- `std::format`, `std::source_location`, `std::jthread`. No macros required.
 
 ## Installation
@@ -35,6 +37,17 @@ logger/src/logger/
   sinks/json_sink.h / .cpp
 ```
 
+## Log Levels
+
+| Level | Abbreviation | Color | Use Case |
+|---|---|---|---|
+| `TRACE` | TRC | Gray #8C8C8C | Fine-grained diagnostic info |
+| `DEBUG` | DBG | Green #80BF40 | Debugging messages |
+| `INFO` | INF | Blue #33A6CC | General informational messages |
+| `SUCCESS` | SUC | Green #4CAF50 | Successful operations |
+| `WARN` | WRN | Yellow #CCBF33 | Warning messages |
+| `ERROR` | ERR | Red #CC3340 | Error messages (routed to stderr) |
+
 ## Console Logging
 
 Console logging works out of the box for console applications. For GUI applications (or DLLs without a host console), explicitly allocate a console:
@@ -49,6 +62,12 @@ cfg.title = "My App";
 cfg.buffer_width = 150;
 cfg.buffer_height = 40;
 log::init_console(cfg);
+```
+
+Console output includes thread names when set:
+
+```
+[12:00:00] [INF] [main.cpp:42] [Worker-1] Processing item 3
 ```
 
 ## File Logging
@@ -73,27 +92,33 @@ log::add_json_sink("logs.json", 5 * 1024 * 1024, 3);
 Example output:
 
 ```json
-{"timestamp":"2026-07-06T12:00:00","level":"INF","file":"main.cpp","line":42,"thread":1234,"message":"User logged in","user_id":"42","ip":"192.168.1.1"}
+{"timestamp":"2026-07-06T12:00:00","level":"SUC","file":"main.cpp","line":42,"thread":1234,"message":"Backup completed","size_mb":"1024"}
 ```
 
 Structured kv pairs are automatically serialized as top-level JSON fields.
 
 ## Structured Logging (kv pairs)
 
-Attach key-value context to any log message:
+Attach key-value context to any log message using `ctx`:
 
 ```cpp
-log::info_ctx("User authenticated", "user", "Artem", "user_id", 42, "ip", "192.168.1.1");
-log::error_ctx("DB query failed", "host", "db-primary", "port", 5432, "timeout_ms", 5000);
+log::info_ctx(
+    std::format("User {} authenticated", user_name),
+    {{"user_id", 42}, {"ip", "192.168.1.1"}}
+);
+log::error_ctx(
+    "Database query failed",
+    {{"host", "db-primary"}, {"port", 5432}}
+);
 ```
 
 Console output:
 
 ```
-[12:00:00] [INF] [main.cpp:42] User authenticated {user=Artem, user_id=42, ip=192.168.1.1}
+[12:00:00] [INF] [main.cpp:42] User Artem authenticated {user_id=42, ip=192.168.1.1}
 ```
 
-Available for all levels: `trace_ctx`, `debug_ctx`, `info_ctx`, `warn_ctx`, `error_ctx`.
+Available for all levels: `trace_ctx`, `debug_ctx`, `info_ctx`, `success_ctx`, `warn_ctx`, `error_ctx`.
 
 ## Thread Naming
 
@@ -103,14 +128,16 @@ Register a human-readable name for the current thread:
 log::set_thread_name("WorkerPool-1");
 ```
 
+The thread name appears in console output when set.
+
 ## Runtime Log Filtering
 
 Filter by severity threshold at runtime:
 
 ```cpp
-log::set_level(log::Level::INFO);   // Only INFO, WARN, ERROR
-log::set_level(log::Level::TRACE);  // Everything
-log::set_level(log::Level::ERROR);  // Only errors
+log::set_level(log::Level::INFO);    // INFO, SUCCESS, WARN, ERROR
+log::set_level(log::Level::TRACE);   // Everything
+log::set_level(log::Level::ERROR);   // Only errors
 ```
 
 Change the threshold at any time without restarting.
@@ -125,8 +152,9 @@ Define `LOG_ACTIVE_LEVEL` before including the header to strip logs from the bin
 
 // This compiles to nothing:
 log::debug("This is gone");
-// This stays:
+// These stay:
 log::info("This remains");
+log::success("This too");
 ```
 
 ## Overflow Behavior
@@ -138,6 +166,17 @@ size_t dropped = log::dropped_count();
 ```
 
 This ensures the logging thread never blocks your application.
+
+## Windows.h Compatibility
+
+The logger handles the `ERROR` macro defined by `<Windows.h>`. You can include `<Windows.h>` before or after the logger without conflicts:
+
+```cpp
+#include <Windows.h>       // defines ERROR=0
+#include "logger/logger.h" // undefines ERROR, Level::ERROR works fine
+
+log::error("This works");  // Level::ERROR is not affected by the macro
+```
 
 ## Custom Sinks
 
@@ -171,13 +210,14 @@ int main() {
     log::set_level(log::Level::TRACE);
 
     log::info("Application started");
+    log::success("Initialization complete");
 
     // Formatted logging
     int user_id = 42;
     log::info("User {} logged in", user_id);
 
     // Structured logging
-    log::info_ctx("Request processed", "user_id", user_id, "latency_ms", 12);
+    log::info_ctx("Request processed", {{"user_id", user_id}, {"latency_ms", 12}});
 
     // Thread naming + multithreading
     log::set_thread_name("Main");
@@ -185,7 +225,8 @@ int main() {
     auto worker = [](int id) {
         log::set_thread_name("Worker-" + std::to_string(id));
         for (int i = 0; i < 5; ++i)
-            log::info_ctx("Processing", "worker", id, "item", i);
+            log::info_ctx(std::format("Processing item {}", i), {{"worker", id}, {"item", i}});
+        log::success("Worker-{} finished", id);
     };
 
     std::thread t1(worker, 1);
@@ -193,7 +234,7 @@ int main() {
     t1.join();
     t2.join();
 
-    log::info("Done (dropped: {} messages)", log::dropped_count());
+    log::success("Done (dropped: {} messages)", log::dropped_count());
     return 0;
 }
 ```
@@ -202,8 +243,13 @@ int main() {
 
 | Function | Description |
 |---|---|
-| `log::info("msg {}", arg)` | Log at INFO level with format string |
-| `log::info_ctx("msg {}", arg, {{"k","v"}})` | Log with structured kv pairs |
+| `log::trace("msg {}", arg)` | Log at TRACE level with format string |
+| `log::debug("msg {}", arg)` | Log at DEBUG level |
+| `log::info("msg {}", arg)` | Log at INFO level |
+| `log::success("msg {}", arg)` | Log at SUCCESS level |
+| `log::warn("msg {}", arg)` | Log at WARN level |
+| `log::error("msg {}", arg)` | Log at ERROR level |
+| `log::info_ctx("msg", {{"k","v"}})` | Log with structured kv pairs |
 | `log::set_level(level)` | Set runtime severity threshold |
 | `log::init_console(cfg)` | Initialize console sink |
 | `log::add_file_sink(path, max_size, max_files)` | Add file sink with rotation |

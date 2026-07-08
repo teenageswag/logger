@@ -9,39 +9,36 @@
 
 namespace log_core {
 
-// Escape a string for JSON
-static std::string json_escape(std::string_view s) {
-  std::string result;
-  result.reserve(s.size() + 8);
+// Escape a string for JSON, appending directly to output
+static void json_escape_to(std::string &out, std::string_view s) {
   for (char c : s) {
     switch (c) {
     case '"':
-      result += "\\\"";
+      out += "\\\"";
       break;
     case '\\':
-      result += "\\\\";
+      out += "\\\\";
       break;
     case '\n':
-      result += "\\n";
+      out += "\\n";
       break;
     case '\r':
-      result += "\\r";
+      out += "\\r";
       break;
     case '\t':
-      result += "\\t";
+      out += "\\t";
       break;
     default:
       if (static_cast<unsigned char>(c) < 0x20) {
         char buf[8];
         std::snprintf(buf, sizeof(buf), "\\u%04x",
                       static_cast<unsigned int>(static_cast<unsigned char>(c)));
-        result += buf;
+        out += buf;
       } else {
-        result += c;
+        out += c;
       }
     }
   }
-  return result;
 }
 
 JsonSink::JsonSink(JsonSinkConfig cfg)
@@ -108,16 +105,29 @@ void JsonSink::write(const LogMessage &msg) {
   std::string_view filename = shorten_filename(msg.loc.file_name());
 
   // Build JSON object
-  std::string json = std::format(
-      "{{\"timestamp\":\"{}\",\"level\":\"{}\",\"file\":\"{}\",\"line\":{},"
-      "\"thread\":{},\"message\":\"{}\"",
-      timestamp_buf, level_to_string(msg.level), json_escape(filename),
-      msg.loc.line(), msg.thread_id, json_escape(msg.text));
+  std::string json;
+  json.reserve(256);
+  json += "{\"timestamp\":\"";
+  json += timestamp_buf;
+  json += "\",\"level\":\"";
+  json += level_to_string(msg.level);
+  json += "\",\"file\":\"";
+  json_escape_to(json, filename);
+  json += "\",\"line\":";
+  json += std::to_string(msg.loc.line());
+  json += ",\"thread\":";
+  json += std::to_string(msg.thread_id);
+  json += ",\"message\":\"";
+  json_escape_to(json, msg.text);
+  json += "\"";
 
   // Add kv pairs as top-level fields
   for (const auto &kv : msg.kv_pairs) {
-    json += std::format(",\"{}\":\"{}\"", json_escape(kv.key),
-                        json_escape(kv.value));
+    json += ",\"";
+    json_escape_to(json, kv.key);
+    json += "\":\"";
+    json_escape_to(json, kv.value);
+    json += "\"";
   }
 
   json += "}\n";

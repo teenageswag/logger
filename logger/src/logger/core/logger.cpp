@@ -33,10 +33,8 @@ Logger::Logger() : queue_(queue_capacity_) {
 Logger::~Logger() {
   {
     std::unique_lock lock(queue_mutex_);
-    // Signal stop via the jthread's stop token — no bool needed
   }
   cv_pop_.notify_one();
-  // jthread destructor requests stop + joins automatically
 
   flush_sinks();
 }
@@ -62,7 +60,7 @@ void Logger::worker_loop(std::stop_token stoken) {
     }
 
     if (!local_batch.empty()) {
-      cv_pop_.notify_all(); // wake producer if blocked (shouldn't happen with drop-oldest)
+      cv_pop_.notify_all();
 
       std::lock_guard lock(sinks_mutex_);
       bool should_flush = false;
@@ -138,63 +136,31 @@ void Logger::remove_console_sinks() {
 
 void Logger::enqueue(Level level, const std::source_location &loc,
                      std::string_view text) {
-  std::unique_lock lock(queue_mutex_);
-
-  if (count_ >= queue_capacity_) {
-    // Drop oldest: overwrite head and advance
-    auto &entry = queue_[head_];
-    entry.level = level;
-    entry.time = std::chrono::system_clock::now();
-    entry.thread_id = get_current_thread_id();
-    entry.loc = loc;
-    entry.text.assign(text);
-    entry.kv_pairs.clear();
-
-    head_ = (head_ + 1) % queue_capacity_;
-    // tail_ stays — we overwrote the oldest, count_ stays the same
-    dropped_count_.fetch_add(1, std::memory_order_relaxed);
-  } else {
-    auto &entry = queue_[tail_];
-    entry.level = level;
-    entry.time = std::chrono::system_clock::now();
-    entry.thread_id = get_current_thread_id();
-    entry.loc = loc;
-    entry.text.assign(text);
-    entry.kv_pairs.clear();
-
-    tail_ = (tail_ + 1) % queue_capacity_;
-    ++count_;
-  }
-
-  lock.unlock();
-  cv_pop_.notify_one();
+  enqueue_impl(level, loc, text, {});
 }
 
 void Logger::enqueue_with_kv(Level level, const std::source_location &loc,
                              std::string_view text,
                              std::vector<kv> kv_pairs) {
+  enqueue_impl(level, loc, text, std::move(kv_pairs));
+}
+
+void Logger::enqueue_impl(Level level, const std::source_location &loc,
+                          std::string_view text, std::vector<kv> kv_pairs) {
   std::unique_lock lock(queue_mutex_);
 
-  if (count_ >= queue_capacity_) {
-    auto &entry = queue_[head_];
-    entry.level = level;
-    entry.time = std::chrono::system_clock::now();
-    entry.thread_id = get_current_thread_id();
-    entry.loc = loc;
-    entry.text.assign(text);
-    entry.kv_pairs = std::move(kv_pairs);
+  auto &entry = (count_ >= queue_capacity_) ? queue_[head_] : queue_[tail_];
+  entry.level = level;
+  entry.time = std::chrono::system_clock::now();
+  entry.thread_id = get_current_thread_id();
+  entry.loc = loc;
+  entry.text.assign(text);
+  entry.kv_pairs = std::move(kv_pairs);
 
+  if (count_ >= queue_capacity_) {
     head_ = (head_ + 1) % queue_capacity_;
     dropped_count_.fetch_add(1, std::memory_order_relaxed);
   } else {
-    auto &entry = queue_[tail_];
-    entry.level = level;
-    entry.time = std::chrono::system_clock::now();
-    entry.thread_id = get_current_thread_id();
-    entry.loc = loc;
-    entry.text.assign(text);
-    entry.kv_pairs = std::move(kv_pairs);
-
     tail_ = (tail_ + 1) % queue_capacity_;
     ++count_;
   }

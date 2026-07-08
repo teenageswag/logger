@@ -3,14 +3,12 @@
 #include "sink.h"
 
 #if defined(_WIN32)
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#undef ERROR
+// Forward-declare Windows types to avoid including <windows.h> in headers,
+// which redefines the ERROR macro and breaks Level::ERROR.
+extern "C" {
+struct _iobuf;
+typedef struct _iobuf FILE;
+}
 #endif
 
 namespace log_core {

@@ -43,6 +43,9 @@ public:
   void enqueue_with_kv(Level level, const std::source_location &loc,
                        std::string_view text, std::vector<kv> kv_pairs);
 
+  void enqueue_impl(Level level, const std::source_location &loc,
+                    std::string_view text, std::vector<kv> kv_pairs);
+
   uint32_t get_thread_id() const { return get_current_thread_id(); }
 
   void set_thread_name(std::string name);

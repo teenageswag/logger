@@ -1,5 +1,10 @@
 #pragma once
 
+// Prevent Windows.h ERROR macro from breaking Level::ERROR
+#ifdef ERROR
+#undef ERROR
+#endif
+
 #include <chrono>
 #include <cstdint>
 #include <format>
@@ -12,7 +17,7 @@
 
 namespace log_core {
 
-enum class Level : uint8_t { TRACE, DEBUG, INFO, WARN, ERROR };
+enum class Level : uint8_t { TRACE, DEBUG, INFO, SUCCESS, WARN, ERROR };
 
 struct kv {
   std::string key;
@@ -62,6 +67,8 @@ inline std::string_view level_to_string(Level level) noexcept {
     return "DBG";
   case Level::INFO:
     return "INF";
+  case Level::SUCCESS:
+    return "SUC";
   case Level::WARN:
     return "WRN";
   case Level::ERROR:
@@ -79,6 +86,8 @@ inline std::string_view level_to_color(Level level) noexcept {
     return "\x1b[38;2;128;191;64m"; // #80BF40
   case Level::INFO:
     return "\x1b[38;2;51;166;204m"; // #33A6CC
+  case Level::SUCCESS:
+    return "\x1b[38;2;76;175;80m"; // #4CAF50
   case Level::WARN:
     return "\x1b[38;2;204;191;51m"; // #CCBF33
   case Level::ERROR:
@@ -105,6 +114,21 @@ inline std::string_view shorten_filename(std::string_view filename) noexcept {
     return filename.substr(pos + 1);
   }
   return filename;
+}
+
+inline std::string format_kv_pairs(const std::vector<kv> &pairs) {
+  if (pairs.empty())
+    return {};
+  std::string result = " {";
+  for (size_t i = 0; i < pairs.size(); ++i) {
+    if (i > 0)
+      result += ", ";
+    result += pairs[i].key;
+    result += "=";
+    result += pairs[i].value;
+  }
+  result += "}";
+  return result;
 }
 
 template <typename... Args> struct log_format_string {

@@ -1,5 +1,17 @@
 #include "console_sink.h"
+#include "../core/logger.h"
 #include "../core/types.h"
+
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#undef ERROR
+#endif
 
 #include <cstdio>
 #include <format>
@@ -70,26 +82,20 @@ void ConsoleSink::write(const LogMessage &msg) {
   get_time_info(msg.time, tm_info);
 
   std::string_view filename = shorten_filename(msg.loc.file_name());
+  std::string kv_suffix = format_kv_pairs(msg.kv_pairs);
 
-  // Build kv suffix
-  std::string kv_suffix;
-  if (!msg.kv_pairs.empty()) {
-    kv_suffix = " {";
-    for (size_t i = 0; i < msg.kv_pairs.size(); ++i) {
-      if (i > 0)
-        kv_suffix += ", ";
-      kv_suffix += msg.kv_pairs[i].key;
-      kv_suffix += "=";
-      kv_suffix += msg.kv_pairs[i].value;
-    }
-    kv_suffix += "}";
+  // Thread name segment
+  std::string thread_segment;
+  const auto &tname = tls_thread_name;
+  if (!tname.empty()) {
+    thread_segment = std::format(" [{}]", tname);
   }
 
-  std::string final_msg =
-      std::format("{}[{:02}:{:02}:{:02}] [{}] [{}:{}] {}{}{}\n",
-                  level_to_color(msg.level), tm_info.tm_hour, tm_info.tm_min,
-                  tm_info.tm_sec, level_to_string(msg.level), filename,
-                  msg.loc.line(), msg.text, kv_suffix, reset_color);
+  std::string final_msg = std::format(
+      "{}[{:02}:{:02}:{:02}] [{}] [{}:{}]{} {}{}{}\n",
+      level_to_color(msg.level), tm_info.tm_hour, tm_info.tm_min,
+      tm_info.tm_sec, level_to_string(msg.level), filename,
+      msg.loc.line(), thread_segment, msg.text, kv_suffix, reset_color);
 
   if (msg.level >= Level::ERROR) {
     std::fputs(final_msg.c_str(), stderr);

@@ -67,20 +67,7 @@ void FileSink::write(const LogMessage &msg) {
   get_time_info(msg.time, tm_info);
 
   std::string_view filename = shorten_filename(msg.loc.file_name());
-
-  // Build kv suffix
-  std::string kv_suffix;
-  if (!msg.kv_pairs.empty()) {
-    kv_suffix = " {";
-    for (size_t i = 0; i < msg.kv_pairs.size(); ++i) {
-      if (i > 0)
-        kv_suffix += ", ";
-      kv_suffix += msg.kv_pairs[i].key;
-      kv_suffix += "=";
-      kv_suffix += msg.kv_pairs[i].value;
-    }
-    kv_suffix += "}";
-  }
+  std::string kv_suffix = format_kv_pairs(msg.kv_pairs);
 
   std::string formatted = std::format(
       "[{:04}-{:02}-{:02} {:02}:{:02}:{:02}] [{}] [{}:{}] {}{}\n",

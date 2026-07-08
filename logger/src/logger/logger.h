@@ -70,125 +70,108 @@ struct log {
     return log_core::Logger::instance().dropped_count();
   }
 
-  // --- Basic log methods (compile-time format string + source_location) ---
-
-  template <typename... Args>
-  static void
-  trace(log_core::log_format_string<std::type_identity_t<Args>...> fmt,
-        Args &&...args) {
-    if constexpr (LOG_ACTIVE_LEVEL <= Level::TRACE) {
+  // --- Internal: compile-time format + enqueue ---
+  template <Level L, typename... Args>
+  static void log_impl(
+      log_core::log_format_string<std::type_identity_t<Args>...> fmt,
+      Args &&...args) {
+    if constexpr (LOG_ACTIVE_LEVEL <= L) {
       thread_local std::string buf;
       buf.clear();
       std::format_to(std::back_inserter(buf), fmt.fmt,
                      std::forward<Args>(args)...);
-      log_core::Logger::instance().enqueue(Level::TRACE, fmt.loc, buf);
+      log_core::Logger::instance().enqueue(L, fmt.loc, buf);
     }
   }
 
-  template <typename... Args>
-  static void
-  debug(log_core::log_format_string<std::type_identity_t<Args>...> fmt,
-        Args &&...args) {
-    if constexpr (LOG_ACTIVE_LEVEL <= Level::DEBUG) {
-      thread_local std::string buf;
-      buf.clear();
-      std::format_to(std::back_inserter(buf), fmt.fmt,
-                     std::forward<Args>(args)...);
-      log_core::Logger::instance().enqueue(Level::DEBUG, fmt.loc, buf);
+  // --- Internal: pre-formatted text + kv context ---
+  template <Level L>
+  static void ctx_impl(std::string text, log_core::ctx kv_ctx,
+                        std::source_location loc =
+                            std::source_location::current()) {
+    if constexpr (LOG_ACTIVE_LEVEL <= L) {
+      log_core::Logger::instance().enqueue_with_kv(
+          L, loc, std::move(text), std::move(kv_ctx.pairs));
     }
   }
 
+  // --- Basic log methods ---
   template <typename... Args>
-  static void
-  info(log_core::log_format_string<std::type_identity_t<Args>...> fmt,
-       Args &&...args) {
-    if constexpr (LOG_ACTIVE_LEVEL <= Level::INFO) {
-      thread_local std::string buf;
-      buf.clear();
-      std::format_to(std::back_inserter(buf), fmt.fmt,
-                     std::forward<Args>(args)...);
-      log_core::Logger::instance().enqueue(Level::INFO, fmt.loc, buf);
-    }
+  static void trace(log_core::log_format_string<std::type_identity_t<Args>...>
+                        fmt,
+                    Args &&...args) {
+    log_impl<Level::TRACE>(fmt, std::forward<Args>(args)...);
   }
 
   template <typename... Args>
-  static void
-  warn(log_core::log_format_string<std::type_identity_t<Args>...> fmt,
-       Args &&...args) {
-    if constexpr (LOG_ACTIVE_LEVEL <= Level::WARN) {
-      thread_local std::string buf;
-      buf.clear();
-      std::format_to(std::back_inserter(buf), fmt.fmt,
-                     std::forward<Args>(args)...);
-      log_core::Logger::instance().enqueue(Level::WARN, fmt.loc, buf);
-    }
+  static void debug(log_core::log_format_string<std::type_identity_t<Args>...>
+                        fmt,
+                    Args &&...args) {
+    log_impl<Level::DEBUG>(fmt, std::forward<Args>(args)...);
   }
 
   template <typename... Args>
-  static void
-  error(log_core::log_format_string<std::type_identity_t<Args>...> fmt,
-        Args &&...args) {
-    if constexpr (LOG_ACTIVE_LEVEL <= Level::ERROR) {
-      thread_local std::string buf;
-      buf.clear();
-      std::format_to(std::back_inserter(buf), fmt.fmt,
-                     std::forward<Args>(args)...);
-      log_core::Logger::instance().enqueue(Level::ERROR, fmt.loc, buf);
-    }
+  static void info(log_core::log_format_string<std::type_identity_t<Args>...>
+                       fmt,
+                   Args &&...args) {
+    log_impl<Level::INFO>(fmt, std::forward<Args>(args)...);
+  }
+
+  template <typename... Args>
+  static void success(log_core::log_format_string<std::type_identity_t<Args>...>
+                          fmt,
+                      Args &&...args) {
+    log_impl<Level::SUCCESS>(fmt, std::forward<Args>(args)...);
+  }
+
+  template <typename... Args>
+  static void warn(log_core::log_format_string<std::type_identity_t<Args>...>
+                       fmt,
+                   Args &&...args) {
+    log_impl<Level::WARN>(fmt, std::forward<Args>(args)...);
+  }
+
+  template <typename... Args>
+  static void error(log_core::log_format_string<std::type_identity_t<Args>...>
+                        fmt,
+                    Args &&...args) {
+    log_impl<Level::ERROR>(fmt, std::forward<Args>(args)...);
   }
 
   // --- Structured log methods with kv pairs ---
-  // These take a pre-formatted message + key-value context.
-  // Usage:
-  //   log::info_ctx(std::format("User {} logged in", name), {{"ip", "1.2.3.4"}});
-
   static void trace_ctx(
       std::string text, log_core::ctx kv_ctx,
       std::source_location loc = std::source_location::current()) {
-    if constexpr (LOG_ACTIVE_LEVEL <= Level::TRACE) {
-      log_core::Logger::instance().enqueue_with_kv(Level::TRACE, loc,
-                                                   std::move(text),
-                                                   std::move(kv_ctx.pairs));
-    }
+    ctx_impl<Level::TRACE>(std::move(text), std::move(kv_ctx), loc);
   }
 
   static void debug_ctx(
       std::string text, log_core::ctx kv_ctx,
       std::source_location loc = std::source_location::current()) {
-    if constexpr (LOG_ACTIVE_LEVEL <= Level::DEBUG) {
-      log_core::Logger::instance().enqueue_with_kv(Level::DEBUG, loc,
-                                                   std::move(text),
-                                                   std::move(kv_ctx.pairs));
-    }
+    ctx_impl<Level::DEBUG>(std::move(text), std::move(kv_ctx), loc);
   }
 
   static void info_ctx(
       std::string text, log_core::ctx kv_ctx,
       std::source_location loc = std::source_location::current()) {
-    if constexpr (LOG_ACTIVE_LEVEL <= Level::INFO) {
-      log_core::Logger::instance().enqueue_with_kv(Level::INFO, loc,
-                                                   std::move(text),
-                                                   std::move(kv_ctx.pairs));
-    }
+    ctx_impl<Level::INFO>(std::move(text), std::move(kv_ctx), loc);
+  }
+
+  static void success_ctx(
+      std::string text, log_core::ctx kv_ctx,
+      std::source_location loc = std::source_location::current()) {
+    ctx_impl<Level::SUCCESS>(std::move(text), std::move(kv_ctx), loc);
   }
 
   static void warn_ctx(
       std::string text, log_core::ctx kv_ctx,
       std::source_location loc = std::source_location::current()) {
-    if constexpr (LOG_ACTIVE_LEVEL <= Level::WARN) {
-      log_core::Logger::instance().enqueue_with_kv(Level::WARN, loc,
-                                                   std::move(text),
-                                                   std::move(kv_ctx.pairs));
-    }
+    ctx_impl<Level::WARN>(std::move(text), std::move(kv_ctx), loc);
   }
 
   static void error_ctx(
       std::string text, log_core::ctx kv_ctx,
       std::source_location loc = std::source_location::current()) {
-    if constexpr (LOG_ACTIVE_LEVEL <= Level::ERROR) {
-      log_core::Logger::instance().enqueue_with_kv(Level::ERROR, loc,
-                                                   std::move(text),
-                                                   std::move(kv_ctx.pairs));
-    }
+    ctx_impl<Level::ERROR>(std::move(text), std::move(kv_ctx), loc);
   }
 };
