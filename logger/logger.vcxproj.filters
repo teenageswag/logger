@@ -43,6 +43,9 @@
     <ClInclude Include="src\logger\logger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\logger\logger_include.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="src\logger\core\types.h">
       <Filter>Header Files\core</Filter>
     </ClInclude>
@@ -50,6 +53,9 @@
       <Filter>Header Files\core</Filter>
     </ClInclude>
     <ClInclude Include="src\logger\sinks\sink.h">
+      <Filter>Header Files\sinks</Filter>
+    </ClInclude>
+    <ClInclude Include="src\logger\sinks\rotating_file.h">
       <Filter>Header Files\sinks</Filter>
     </ClInclude>
     <ClInclude Include="src\logger\sinks\console_sink.h">

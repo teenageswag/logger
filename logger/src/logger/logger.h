@@ -8,170 +8,209 @@
 
 #include <filesystem>
 #include <format>
+#include <iterator>
+#include <memory>
+#include <source_location>
 #include <string>
-#include <string_view>
 #include <type_traits>
-#include <vector>
+#include <utility>
 
 #ifndef LOG_ACTIVE_LEVEL
-#define LOG_ACTIVE_LEVEL log::Level::TRACE
+#define LOG_ACTIVE_LEVEL log::Level::Trace
 #endif
 
 struct log {
   using Level = log_core::Level;
+  using Config = log_core::LoggerConfig;
   using Sink = log_core::Sink;
   using ConsoleConfig = log_core::ConsoleSinkConfig;
+  using Field = log_core::Field;
+  using Fields = log_core::Fields;
   using kv = log_core::kv;
   using ctx = log_core::ctx;
 
   static log_core::Logger &instance() { return log_core::Logger::instance(); }
 
-  static void set_level(Level level) {
-    log_core::Logger::instance().set_level(level);
+  static void set_level(Level level) { instance().set_level(level); }
+  static Level level() { return instance().get_level(); }
+  static bool enabled(Level level) { return instance().enabled(level); }
+  static void configure(const Config &config = {}) { instance().configure(config); }
+
+  static void add_sink(std::unique_ptr<Sink> sink) {
+    instance().add_sink(std::move(sink));
   }
 
   static void add_file_sink(const std::filesystem::path &path,
                             size_t max_size = 5 * 1024 * 1024,
                             size_t max_files = 1) {
-    log_core::Logger::instance().add_sink(
-        std::make_unique<log_core::FileSink>(path, max_size, max_files));
+    add_sink(std::make_unique<log_core::FileSink>(path, max_size, max_files));
   }
 
   static void add_json_sink(const std::filesystem::path &path,
                             size_t max_size = 10 * 1024 * 1024,
                             size_t max_files = 3) {
-    log_core::JsonSinkConfig cfg;
-    cfg.path = path;
-    cfg.max_size = max_size;
-    cfg.max_files = max_files;
-    log_core::Logger::instance().add_sink(
-        std::make_unique<log_core::JsonSink>(std::move(cfg)));
+    log_core::JsonSinkConfig config;
+    config.path = path;
+    config.max_size = max_size;
+    config.max_files = max_files;
+    add_sink(std::make_unique<log_core::JsonSink>(std::move(config)));
   }
 
-  static void add_console_sink(ConsoleConfig cfg = {}) {
-    log_core::Logger::instance().remove_console_sinks();
-    log_core::Logger::instance().add_sink(
-        std::make_unique<log_core::ConsoleSink>(std::move(cfg)));
+  static void add_console_sink(ConsoleConfig config = {}) {
+    if (instance().only_in_debug_build() && !log_core::is_debug_build) {
+      instance().remove_console_sinks();
+      return;
+    }
+    instance().remove_console_sinks();
+    add_sink(std::make_unique<log_core::ConsoleSink>(std::move(config)));
   }
 
-  static void remove_console_sink() {
-    log_core::Logger::instance().remove_console_sinks();
-  }
-
-  static void init_console(ConsoleConfig cfg = {}) {
-    add_console_sink(std::move(cfg));
+  static void remove_console_sink() { instance().remove_console_sinks(); }
+  static void init_console(ConsoleConfig config = {}) {
+    add_console_sink(std::move(config));
   }
 
   static void set_thread_name(std::string name) {
-    log_core::Logger::instance().set_thread_name(std::move(name));
+    instance().set_thread_name(std::move(name));
   }
 
-  static size_t dropped_count() {
-    return log_core::Logger::instance().dropped_count();
+  static size_t dropped_count() { return instance().dropped_count(); }
+  static size_t sink_error_count() { return instance().sink_error_count(); }
+  static bool set_queue_capacity(size_t capacity) {
+    return instance().set_queue_capacity(capacity);
   }
+  static void flush() { instance().flush(); }
+  static void shutdown() { instance().shutdown(); }
 
-  // --- Internal: compile-time format + enqueue ---
+private:
   template <Level L, typename... Args>
   static void log_impl(
       log_core::log_format_string<std::type_identity_t<Args>...> fmt,
       Args &&...args) {
     if constexpr (LOG_ACTIVE_LEVEL <= L) {
-      thread_local std::string buf;
-      buf.clear();
-      std::format_to(std::back_inserter(buf), fmt.fmt,
+      if (!instance().enabled(L))
+        return;
+      thread_local std::string buffer;
+      buffer.clear();
+      std::format_to(std::back_inserter(buffer), fmt.fmt,
                      std::forward<Args>(args)...);
-      log_core::Logger::instance().enqueue(L, fmt.loc, buf);
+      instance().enqueue(L, fmt.loc, buffer);
     }
   }
 
-  // --- Internal: pre-formatted text + kv context ---
-  template <Level L>
-  static void ctx_impl(std::string text, log_core::ctx kv_ctx,
-                        std::source_location loc =
-                            std::source_location::current()) {
+  template <Level L, typename... Args>
+  static void fields_log_impl(
+      log_core::Fields fields,
+      log_core::log_format_string<std::type_identity_t<Args>...> fmt,
+      Args &&...args) {
     if constexpr (LOG_ACTIVE_LEVEL <= L) {
-      log_core::Logger::instance().enqueue_with_kv(
-          L, loc, std::move(text), std::move(kv_ctx.pairs));
+      if (!instance().enabled(L))
+        return;
+      thread_local std::string buffer;
+      buffer.clear();
+      std::format_to(std::back_inserter(buffer), fmt.fmt,
+                     std::forward<Args>(args)...);
+      instance().enqueue_with_fields(L, fmt.loc, buffer,
+                                     std::move(fields.values));
     }
   }
 
-  // --- Basic log methods ---
+  template <Level L>
+  static void ctx_impl(std::string text, log_core::Fields fields,
+                       std::source_location loc) {
+    if constexpr (LOG_ACTIVE_LEVEL <= L) {
+      if (!instance().enabled(L))
+        return;
+      instance().enqueue_with_fields(L, loc, text, std::move(fields.values));
+    }
+  }
+
+public:
   template <typename... Args>
   static void trace(log_core::log_format_string<std::type_identity_t<Args>...>
                         fmt,
                     Args &&...args) {
-    log_impl<Level::TRACE>(fmt, std::forward<Args>(args)...);
+    log_impl<Level::Trace>(fmt, std::forward<Args>(args)...);
   }
-
   template <typename... Args>
   static void debug(log_core::log_format_string<std::type_identity_t<Args>...>
                         fmt,
                     Args &&...args) {
-    log_impl<Level::DEBUG>(fmt, std::forward<Args>(args)...);
+    log_impl<Level::Debug>(fmt, std::forward<Args>(args)...);
   }
-
   template <typename... Args>
   static void info(log_core::log_format_string<std::type_identity_t<Args>...>
                        fmt,
                    Args &&...args) {
-    log_impl<Level::INFO>(fmt, std::forward<Args>(args)...);
+    log_impl<Level::Info>(fmt, std::forward<Args>(args)...);
   }
-
   template <typename... Args>
-  static void success(log_core::log_format_string<std::type_identity_t<Args>...>
-                          fmt,
-                      Args &&...args) {
-    log_impl<Level::SUCCESS>(fmt, std::forward<Args>(args)...);
+  static void success(
+      log_core::log_format_string<std::type_identity_t<Args>...> fmt,
+      Args &&...args) {
+    log_impl<Level::Success>(fmt, std::forward<Args>(args)...);
   }
-
   template <typename... Args>
   static void warn(log_core::log_format_string<std::type_identity_t<Args>...>
                        fmt,
                    Args &&...args) {
-    log_impl<Level::WARN>(fmt, std::forward<Args>(args)...);
+    log_impl<Level::Warn>(fmt, std::forward<Args>(args)...);
   }
-
   template <typename... Args>
   static void error(log_core::log_format_string<std::type_identity_t<Args>...>
                         fmt,
                     Args &&...args) {
-    log_impl<Level::ERROR>(fmt, std::forward<Args>(args)...);
+    log_impl<Level::Error>(fmt, std::forward<Args>(args)...);
+  }
+  template <typename... Args>
+  static void critical(
+      log_core::log_format_string<std::type_identity_t<Args>...> fmt,
+      Args &&...args) {
+    log_impl<Level::Critical>(fmt, std::forward<Args>(args)...);
   }
 
-  // --- Structured log methods with kv pairs ---
-  static void trace_ctx(
-      std::string text, log_core::ctx kv_ctx,
-      std::source_location loc = std::source_location::current()) {
-    ctx_impl<Level::TRACE>(std::move(text), std::move(kv_ctx), loc);
+  template <typename... Args>
+  static void info(
+      log_core::Fields fields,
+      log_core::log_format_string<std::type_identity_t<Args>...> fmt,
+      Args &&...args) {
+    fields_log_impl<Level::Info>(std::move(fields), fmt,
+                                 std::forward<Args>(args)...);
   }
 
-  static void debug_ctx(
-      std::string text, log_core::ctx kv_ctx,
-      std::source_location loc = std::source_location::current()) {
-    ctx_impl<Level::DEBUG>(std::move(text), std::move(kv_ctx), loc);
+  static void trace_ctx(std::string text, log_core::ctx fields,
+                        std::source_location loc =
+                            std::source_location::current()) {
+    ctx_impl<Level::Trace>(std::move(text), std::move(fields), loc);
   }
-
-  static void info_ctx(
-      std::string text, log_core::ctx kv_ctx,
-      std::source_location loc = std::source_location::current()) {
-    ctx_impl<Level::INFO>(std::move(text), std::move(kv_ctx), loc);
+  static void debug_ctx(std::string text, log_core::ctx fields,
+                        std::source_location loc =
+                            std::source_location::current()) {
+    ctx_impl<Level::Debug>(std::move(text), std::move(fields), loc);
   }
-
-  static void success_ctx(
-      std::string text, log_core::ctx kv_ctx,
-      std::source_location loc = std::source_location::current()) {
-    ctx_impl<Level::SUCCESS>(std::move(text), std::move(kv_ctx), loc);
+  static void info_ctx(std::string text, log_core::ctx fields,
+                       std::source_location loc =
+                           std::source_location::current()) {
+    ctx_impl<Level::Info>(std::move(text), std::move(fields), loc);
   }
-
-  static void warn_ctx(
-      std::string text, log_core::ctx kv_ctx,
-      std::source_location loc = std::source_location::current()) {
-    ctx_impl<Level::WARN>(std::move(text), std::move(kv_ctx), loc);
+  static void success_ctx(std::string text, log_core::ctx fields,
+                          std::source_location loc =
+                              std::source_location::current()) {
+    ctx_impl<Level::Success>(std::move(text), std::move(fields), loc);
   }
-
-  static void error_ctx(
-      std::string text, log_core::ctx kv_ctx,
-      std::source_location loc = std::source_location::current()) {
-    ctx_impl<Level::ERROR>(std::move(text), std::move(kv_ctx), loc);
+  static void warn_ctx(std::string text, log_core::ctx fields,
+                       std::source_location loc =
+                           std::source_location::current()) {
+    ctx_impl<Level::Warn>(std::move(text), std::move(fields), loc);
+  }
+  static void error_ctx(std::string text, log_core::ctx fields,
+                        std::source_location loc =
+                            std::source_location::current()) {
+    ctx_impl<Level::Error>(std::move(text), std::move(fields), loc);
+  }
+  static void critical_ctx(std::string text, log_core::ctx fields,
+                           std::source_location loc =
+                               std::source_location::current()) {
+    ctx_impl<Level::Critical>(std::move(text), std::move(fields), loc);
   }
 };

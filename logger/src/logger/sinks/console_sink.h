@@ -2,41 +2,44 @@
 
 #include "sink.h"
 
-#if defined(_WIN32)
-// Forward-declare Windows types to avoid including <windows.h> in headers,
-// which redefines the ERROR macro and breaks Level::ERROR.
-extern "C" {
-struct _iobuf;
-typedef struct _iobuf FILE;
-}
-#endif
-
 namespace log_core {
 
 struct ConsoleSinkConfig {
   bool auto_alloc = true;
-  std::string title = "";
+  std::string title;
   uint16_t buffer_width = 120;
   uint16_t buffer_height = 30;
-  bool redirect_streams = true;
+
+  // Kept for source compatibility. ConsoleSink no longer redirects or closes
+  // the host process' standard streams.
+  bool redirect_streams = false;
+  bool enable_colors = true;
+  bool enable_backgrounds = false;
+  bool force_ansi = false;
+  bool free_owned_console = true;
+  bool show_thread_name = true;
+  bool show_thread_id = false;
 };
 
-class ConsoleSink : public Sink {
+class ConsoleSink final : public Sink {
 public:
-  explicit ConsoleSink(ConsoleSinkConfig cfg = {});
+  explicit ConsoleSink(ConsoleSinkConfig config = {});
   ~ConsoleSink() override;
 
   ConsoleSink(const ConsoleSink &) = delete;
   ConsoleSink &operator=(const ConsoleSink &) = delete;
 
-  void write(const LogMessage &msg) override;
+  void write(const LogMessage &message) override;
   void flush() override;
 
 private:
+  ConsoleSinkConfig config_;
+  bool owns_console_ = false;
+  bool ansi_enabled_ = false;
+
 #if defined(_WIN32)
-  FILE *stdout_file_ = nullptr;
-  FILE *stderr_file_ = nullptr;
-  FILE *stdin_file_ = nullptr;
+  void *stdout_handle_ = nullptr;
+  void *stderr_handle_ = nullptr;
 #endif
 };
 

@@ -11,15 +11,21 @@
 #include <windows.h>
 #endif
 
-#define LOG_ACTIVE_LEVEL log::Level::TRACE
+#define LOG_ACTIVE_LEVEL log::Level::Trace
 #include "logger/logger.h"
 
 int main() {
+  log::Config logger_cfg;
+  logger_cfg.only_in_debug_build = true;
+  logger_cfg.level = log::Level::Trace;
+  log::configure(logger_cfg);
+
   // --- Console setup ---
   log::ConsoleConfig cfg;
   cfg.title = "Logger Demo";
   cfg.buffer_width = 150;
   cfg.buffer_height = 40;
+  cfg.enable_backgrounds = true;
   log::init_console(cfg);
 
   // --- File sink with 3 rotation backups ---
@@ -28,9 +34,6 @@ int main() {
   // --- JSON sink for structured log aggregation ---
   log::add_json_sink("logs.json", 5 * 1024 * 1024, 3);
 
-  // --- Runtime level (TRACE = log everything) ---
-  log::set_level(log::Level::TRACE);
-
   // --- Basic logging ---
   log::trace("This is a trace message");
   log::debug("This is a debug message");
@@ -38,6 +41,7 @@ int main() {
   log::success("Database migration completed: {} tables", 12);
   log::warn("Disk usage is at 87%");
   log::error("Failed to connect to database: {}", "localhost:5432");
+  log::critical("Critical service failure: {}", "database unavailable");
 
   // --- Formatted logging ---
   int user_id = 42;

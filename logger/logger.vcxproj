@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\example\main.cpp" />
+    <ClCompile Include="src\example.cpp" />
     <ClCompile Include="src\logger\core\logger.cpp" />
     <ClCompile Include="src\logger\sinks\console_sink.cpp" />
     <ClCompile Include="src\logger\sinks\file_sink.cpp" />
@@ -30,6 +30,7 @@
     <ClInclude Include="src\logger\core\types.h" />
     <ClInclude Include="src\logger\core\logger.h" />
     <ClInclude Include="src\logger\sinks\sink.h" />
+    <ClInclude Include="src\logger\sinks\rotating_file.h" />
     <ClInclude Include="src\logger\sinks\console_sink.h" />
     <ClInclude Include="src\logger\sinks\file_sink.h" />
     <ClInclude Include="src\logger\sinks\json_sink.h" />
@@ -87,27 +88,27 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>..\build\debug\win32\</OutDir>
-    <IntDir>..\build\debug\win32\intermediates\</IntDir>
-    <TargetName>logger</TargetName>
+    <OutDir>$(SolutionDir)\build\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\build\$(Configuration)\$(PlatformTarget)\</IntDir>
+    <TargetName>example</TargetName>
     <IncludePath>src/;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>..\build\release\win32\</OutDir>
-    <IntDir>..\build\release\win32\intermediates\</IntDir>
-    <TargetName>logger</TargetName>
+    <OutDir>$(SolutionDir)\build\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\build\$(Configuration)\$(PlatformTarget)\</IntDir>
+    <TargetName>example</TargetName>
     <IncludePath>src/;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>..\build\debug\win64\</OutDir>
-    <IntDir>..\build\debug\win64\intermediates\</IntDir>
-    <TargetName>logger</TargetName>
+    <OutDir>$(SolutionDir)\build\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\build\$(Configuration)\$(PlatformTarget)\</IntDir>
+    <TargetName>example</TargetName>
     <IncludePath>src/;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>..\build\release\win64\</OutDir>
-    <IntDir>..\build\release\win64\intermediates\</IntDir>
-    <TargetName>logger</TargetName>
+    <OutDir>$(SolutionDir)\build\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\build\$(Configuration)\$(PlatformTarget)\</IntDir>
+    <TargetName>example</TargetName>
     <IncludePath>src/;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -121,7 +122,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -153,7 +154,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
