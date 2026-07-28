@@ -35,7 +35,7 @@ public:
     // A zero limit disables size-based rotation. A single oversized record is
     // written to an empty file instead of causing a rotate loop.
     if (max_size_ != 0 && current_size_ != 0 &&
-        data.size() > max_size_ - std::min(current_size_, max_size_)) {
+        data.size() > max_size_ - (std::min)(current_size_, max_size_)) {
       if (!rotate())
         return false;
     }
