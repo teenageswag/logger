@@ -31,6 +31,18 @@ HANDLE open_console_output() {
                      FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
                      0, nullptr);
 }
+
+// Freshly attached/allocated conhost buffers don't have VT sequence
+// processing enabled by default (unlike handles inherited from a modern
+// terminal host). Without this, ANSI escape codes print as literal text
+// instead of being interpreted as color/formatting.
+void enable_vt_processing(HANDLE handle) {
+  if (!valid_handle(handle))
+    return;
+  DWORD mode = 0;
+  if (GetConsoleMode(handle, &mode))
+    SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+}
 } // namespace
 #endif
 
@@ -64,6 +76,11 @@ ConsoleSink::ConsoleSink(ConsoleSinkConfig config)
       SetConsoleScreenBufferSize(output, coord);
       SetConsoleOutputCP(CP_UTF8);
     }
+
+    // Must be set on each CONOUT$ handle individually — stdout_handle_ and
+    // stderr_handle_ are separate opens and don't share console mode state.
+    enable_vt_processing(stdout_handle_);
+    enable_vt_processing(stderr_handle_);
   }
 
   ansi_enabled_ = config_.enable_colors &&
