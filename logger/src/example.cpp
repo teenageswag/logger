@@ -26,6 +26,10 @@ int main() {
   cfg.buffer_width = 150;
   cfg.buffer_height = 40;
   cfg.enable_backgrounds = true;
+  cfg.show_date = true;
+  cfg.show_time = true;
+  cfg.show_file = true;
+  cfg.time_format = log::ConsoleConfig::TimeFormat::WithMilliseconds;
   log::init_console(cfg);
 
   // --- File sink with 3 rotation backups ---

@@ -15,6 +15,8 @@
 
 #include <cstdio>
 #include <format>
+#include <string>
+#include <vector>
 
 namespace log_core {
 
@@ -89,9 +91,28 @@ ConsoleSink::~ConsoleSink() {
 }
 
 void ConsoleSink::write(const LogMessage &message) {
-  const auto time = format_timestamp(message.time);
-  const auto filename = shorten_filename(message.loc.file_name());
   const auto fields = format_fields(message.fields);
+
+  std::vector<std::string> segments;
+  if (config_.show_date || config_.show_time) {
+    std::string timestamp;
+    if (config_.show_date)
+      timestamp = format_date(message.time);
+    if (config_.show_time) {
+      if (!timestamp.empty())
+        timestamp += ' ';
+      timestamp += format_time(
+          message.time,
+          config_.time_format == ConsoleSinkConfig::TimeFormat::WithMilliseconds);
+    }
+    segments.push_back(std::format("[{}]", timestamp));
+  }
+  segments.push_back(std::format("[{}]", level_to_string(message.level)));
+  if (config_.show_file) {
+    segments.push_back(std::format("[{}:{}]",
+                                   shorten_filename(message.loc.file_name()),
+                                   message.loc.line()));
+  }
 
   std::string thread_segment;
   if (config_.show_thread_name && !message.thread_name.empty())
@@ -107,10 +128,15 @@ void ConsoleSink::write(const LogMessage &message) {
       ansi_prefix += level_to_background_color(message.level);
   }
 
+  std::string prefix = ansi_prefix;
+  for (const auto &segment : segments) {
+    prefix += segment;
+    prefix += ' ';
+  }
+
   const std::string final_message = std::format(
-      "{}[{}] [{}] [{}:{}]{} {}{}{}\n", ansi_prefix, time,
-      level_to_string(message.level), filename, message.loc.line(),
-      thread_segment, message.text, fields,
+      "{}{}{}{}{}\n", prefix, thread_segment,
+      thread_segment.empty() ? std::string{} : std::string{" "}, message.text,
       ansi_enabled_ ? std::string(reset_color) : std::string{});
 
 #if defined(_WIN32)

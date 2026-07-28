@@ -5,6 +5,11 @@
 namespace log_core {
 
 struct ConsoleSinkConfig {
+  enum class TimeFormat {
+    WithMilliseconds,
+    WithoutMilliseconds,
+  };
+
   bool auto_alloc = true;
   std::string title;
   uint16_t buffer_width = 120;
@@ -17,6 +22,10 @@ struct ConsoleSinkConfig {
   bool enable_backgrounds = false;
   bool force_ansi = false;
   bool free_owned_console = true;
+  bool show_date = true;
+  bool show_time = true;
+  bool show_file = true;
+  TimeFormat time_format = TimeFormat::WithMilliseconds;
   bool show_thread_name = true;
   bool show_thread_id = false;
 };

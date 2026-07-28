@@ -132,19 +132,19 @@ inline std::string_view level_to_string(Level level) noexcept {
 inline std::string_view level_to_color(Level level) noexcept {
   switch (level) {
   case Level::Trace:
-    return "\x1b[38;2;140;140;140m";
+    return "\x1b[38;2;148;163;184m";
   case Level::Debug:
-    return "\x1b[38;2;128;191;64m";
+    return "\x1b[38;2;167;139;250m";
   case Level::Info:
-    return "\x1b[38;2;51;166;204m";
+    return "\x1b[38;2;96;165;250m";
   case Level::Success:
-    return "\x1b[38;2;76;175;80m";
+    return "\x1b[38;2;52;211;153m";
   case Level::Warn:
-    return "\x1b[38;2;204;191;51m";
+    return "\x1b[38;2;251;191;36m";
   case Level::Error:
-    return "\x1b[38;2;204;51;64m";
+    return "\x1b[38;2;248;113;113m";
   case Level::Critical:
-    return "\x1b[38;2;255;255;255m";
+    return "\x1b[38;2;255;153;153m";
   }
   return "\x1b[0m";
 }
@@ -152,19 +152,19 @@ inline std::string_view level_to_color(Level level) noexcept {
 inline std::string_view level_to_background_color(Level level) noexcept {
   switch (level) {
   case Level::Trace:
-    return "\x1b[48;2;55;55;55m";
+    return "\x1b[48;2;51;65;85m";
   case Level::Debug:
-    return "\x1b[48;2;24;72;24m";
+    return "\x1b[48;2;76;29;149m";
   case Level::Info:
-    return "\x1b[48;2;18;58;78m";
+    return "\x1b[48;2;30;58;138m";
   case Level::Success:
-    return "\x1b[48;2;20;75;32m";
+    return "\x1b[48;2;6;95;70m";
   case Level::Warn:
-    return "\x1b[48;2;90;75;18m";
+    return "\x1b[48;2;120;53;15m";
   case Level::Error:
-    return "\x1b[48;2;95;20;28m";
+    return "\x1b[48;2;127;29;29m";
   case Level::Critical:
-    return "\x1b[48;2;155;20;20m";
+    return "\x1b[48;2;153;27;27m";
   }
   return "\x1b[0m";
 }
@@ -179,6 +179,28 @@ inline bool get_time_info(std::chrono::system_clock::time_point tp,
 #else
   return localtime_r(&time, &tm_info) != nullptr;
 #endif
+}
+
+inline std::string format_date(std::chrono::system_clock::time_point tp) {
+  struct tm tm_info {};
+  get_time_info(tp, tm_info);
+  return std::format("{:04}-{:02}-{:02}", tm_info.tm_year + 1900,
+                     tm_info.tm_mon + 1, tm_info.tm_mday);
+}
+
+inline std::string format_time(std::chrono::system_clock::time_point tp,
+                               bool with_milliseconds = true) {
+  struct tm tm_info {};
+  get_time_info(tp, tm_info);
+  const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      tp.time_since_epoch()) %
+                  1000;
+  if (with_milliseconds) {
+    return std::format("{:02}:{:02}:{:02}:{:03}", tm_info.tm_hour,
+                       tm_info.tm_min, tm_info.tm_sec, ms.count());
+  }
+  return std::format("{:02}:{:02}:{:02}", tm_info.tm_hour, tm_info.tm_min,
+                     tm_info.tm_sec);
 }
 
 inline std::string format_timestamp(

@@ -1,0 +1,77 @@
+{"timestamp":"2026-07-28T09:11:28.642","level":"TRC","file":"example.cpp","line":42,"thread":24100,"message":"This is a trace message"}
+{"timestamp":"2026-07-28T09:11:28.642","level":"DBG","file":"example.cpp","line":43,"thread":24100,"message":"This is a debug message"}
+{"timestamp":"2026-07-28T09:11:28.642","level":"INF","file":"example.cpp","line":44,"thread":24100,"message":"Application started successfully"}
+{"timestamp":"2026-07-28T09:11:28.642","level":"SUC","file":"example.cpp","line":45,"thread":24100,"message":"Database migration completed: 12 tables"}
+{"timestamp":"2026-07-28T09:11:28.642","level":"WRN","file":"example.cpp","line":46,"thread":24100,"message":"Disk usage is at 87%"}
+{"timestamp":"2026-07-28T09:11:28.642","level":"ERR","file":"example.cpp","line":47,"thread":24100,"message":"Failed to connect to database: localhost:5432"}
+{"timestamp":"2026-07-28T09:11:28.642","level":"CRT","file":"example.cpp","line":48,"thread":24100,"message":"Critical service failure: database unavailable"}
+{"timestamp":"2026-07-28T09:11:28.642","level":"INF","file":"example.cpp","line":53,"thread":24100,"message":"User Artem (ID: 42) logged in successfully"}
+{"timestamp":"2026-07-28T09:11:28.642","level":"SUC","file":"example.cpp","line":54,"thread":24100,"message":"User Artem authenticated via OAuth2"}
+{"timestamp":"2026-07-28T09:11:28.642","level":"INF","file":"example.cpp","line":57,"thread":24100,"message":"User Artem authenticated","user_id":42,"ip":"192.168.1.100"}
+{"timestamp":"2026-07-28T09:11:28.642","level":"SUC","file":"example.cpp","line":61,"thread":24100,"message":"Backup completed for Artem","size_mb":1024,"duration_sec":45}
+{"timestamp":"2026-07-28T09:11:28.642","level":"ERR","file":"example.cpp","line":65,"thread":24100,"message":"Database query failed","host":"db-primary","port":5432,"query":"SELECT * FROM users"}
+{"timestamp":"2026-07-28T09:11:28.642","level":"WRN","file":"example.cpp","line":70,"thread":24100,"message":"High memory usage","rss_mb":2048,"threshold_mb":4096}
+{"timestamp":"2026-07-28T09:12:05.032","level":"TRC","file":"example.cpp","line":42,"thread":22532,"message":"This is a trace message"}
+{"timestamp":"2026-07-28T09:12:05.032","level":"DBG","file":"example.cpp","line":43,"thread":22532,"message":"This is a debug message"}
+{"timestamp":"2026-07-28T09:12:05.033","level":"INF","file":"example.cpp","line":44,"thread":22532,"message":"Application started successfully"}
+{"timestamp":"2026-07-28T09:12:05.033","level":"SUC","file":"example.cpp","line":45,"thread":22532,"message":"Database migration completed: 12 tables"}
+{"timestamp":"2026-07-28T09:12:05.033","level":"WRN","file":"example.cpp","line":46,"thread":22532,"message":"Disk usage is at 87%"}
+{"timestamp":"2026-07-28T09:12:05.033","level":"ERR","file":"example.cpp","line":47,"thread":22532,"message":"Failed to connect to database: localhost:5432"}
+{"timestamp":"2026-07-28T09:12:05.033","level":"CRT","file":"example.cpp","line":48,"thread":22532,"message":"Critical service failure: database unavailable"}
+{"timestamp":"2026-07-28T09:12:05.033","level":"INF","file":"example.cpp","line":53,"thread":22532,"message":"User Artem (ID: 42) logged in successfully"}
+{"timestamp":"2026-07-28T09:12:05.033","level":"SUC","file":"example.cpp","line":54,"thread":22532,"message":"User Artem authenticated via OAuth2"}
+{"timestamp":"2026-07-28T09:12:05.033","level":"INF","file":"example.cpp","line":57,"thread":22532,"message":"User Artem authenticated","user_id":42,"ip":"192.168.1.100"}
+{"timestamp":"2026-07-28T09:12:05.033","level":"SUC","file":"example.cpp","line":61,"thread":22532,"message":"Backup completed for Artem","size_mb":1024,"duration_sec":45}
+{"timestamp":"2026-07-28T09:12:05.033","level":"ERR","file":"example.cpp","line":65,"thread":22532,"message":"Database query failed","host":"db-primary","port":5432,"query":"SELECT * FROM users"}
+{"timestamp":"2026-07-28T09:12:05.033","level":"WRN","file":"example.cpp","line":70,"thread":22532,"message":"High memory usage","rss_mb":2048,"threshold_mb":4096}
+{"timestamp":"2026-07-28T09:12:05.033","level":"INF","file":"example.cpp","line":82,"thread":13152,"thread_name":"Worker-2","message":"Processing item 0","worker":2,"item":0}
+{"timestamp":"2026-07-28T09:12:05.033","level":"INF","file":"example.cpp","line":82,"thread":23696,"thread_name":"Worker-1","message":"Processing item 0","worker":1,"item":0}
+{"timestamp":"2026-07-28T09:12:05.033","level":"INF","file":"example.cpp","line":82,"thread":10436,"thread_name":"Worker-3","message":"Processing item 0","worker":3,"item":0}
+{"timestamp":"2026-07-28T09:12:05.049","level":"INF","file":"example.cpp","line":82,"thread":10436,"thread_name":"Worker-3","message":"Processing item 1","worker":3,"item":1}
+{"timestamp":"2026-07-28T09:12:05.049","level":"INF","file":"example.cpp","line":82,"thread":23696,"thread_name":"Worker-1","message":"Processing item 1","worker":1,"item":1}
+{"timestamp":"2026-07-28T09:12:05.049","level":"INF","file":"example.cpp","line":82,"thread":13152,"thread_name":"Worker-2","message":"Processing item 1","worker":2,"item":1}
+{"timestamp":"2026-07-28T09:12:05.065","level":"INF","file":"example.cpp","line":82,"thread":10436,"thread_name":"Worker-3","message":"Processing item 2","worker":3,"item":2}
+{"timestamp":"2026-07-28T09:12:05.065","level":"INF","file":"example.cpp","line":82,"thread":23696,"thread_name":"Worker-1","message":"Processing item 2","worker":1,"item":2}
+{"timestamp":"2026-07-28T09:12:05.065","level":"INF","file":"example.cpp","line":82,"thread":13152,"thread_name":"Worker-2","message":"Processing item 2","worker":2,"item":2}
+{"timestamp":"2026-07-28T09:12:05.081","level":"INF","file":"example.cpp","line":82,"thread":10436,"thread_name":"Worker-3","message":"Processing item 3","worker":3,"item":3}
+{"timestamp":"2026-07-28T09:12:05.081","level":"INF","file":"example.cpp","line":82,"thread":13152,"thread_name":"Worker-2","message":"Processing item 3","worker":2,"item":3}
+{"timestamp":"2026-07-28T09:12:05.081","level":"INF","file":"example.cpp","line":82,"thread":23696,"thread_name":"Worker-1","message":"Processing item 3","worker":1,"item":3}
+{"timestamp":"2026-07-28T09:12:05.097","level":"INF","file":"example.cpp","line":82,"thread":13152,"thread_name":"Worker-2","message":"Processing item 4","worker":2,"item":4}
+{"timestamp":"2026-07-28T09:12:05.097","level":"INF","file":"example.cpp","line":82,"thread":10436,"thread_name":"Worker-3","message":"Processing item 4","worker":3,"item":4}
+{"timestamp":"2026-07-28T09:12:05.097","level":"INF","file":"example.cpp","line":82,"thread":23696,"thread_name":"Worker-1","message":"Processing item 4","worker":1,"item":4}
+{"timestamp":"2026-07-28T09:12:05.113","level":"SUC","file":"example.cpp","line":88,"thread":10436,"thread_name":"Worker-3","message":"Worker-3 finished all tasks"}
+{"timestamp":"2026-07-28T09:12:05.113","level":"SUC","file":"example.cpp","line":88,"thread":13152,"thread_name":"Worker-2","message":"Worker-2 finished all tasks"}
+{"timestamp":"2026-07-28T09:12:05.113","level":"SUC","file":"example.cpp","line":88,"thread":23696,"thread_name":"Worker-1","message":"Worker-1 finished all tasks"}
+{"timestamp":"2026-07-28T09:12:05.113","level":"SUC","file":"example.cpp","line":99,"thread":22532,"thread_name":"Main","message":"All workers finished (dropped: 0 messages)"}
+{"timestamp":"2026-07-28T09:12:08.818","level":"TRC","file":"example.cpp","line":42,"thread":14164,"message":"This is a trace message"}
+{"timestamp":"2026-07-28T09:12:08.819","level":"DBG","file":"example.cpp","line":43,"thread":14164,"message":"This is a debug message"}
+{"timestamp":"2026-07-28T09:12:08.819","level":"INF","file":"example.cpp","line":44,"thread":14164,"message":"Application started successfully"}
+{"timestamp":"2026-07-28T09:12:08.819","level":"SUC","file":"example.cpp","line":45,"thread":14164,"message":"Database migration completed: 12 tables"}
+{"timestamp":"2026-07-28T09:12:08.819","level":"WRN","file":"example.cpp","line":46,"thread":14164,"message":"Disk usage is at 87%"}
+{"timestamp":"2026-07-28T09:12:08.819","level":"ERR","file":"example.cpp","line":47,"thread":14164,"message":"Failed to connect to database: localhost:5432"}
+{"timestamp":"2026-07-28T09:12:08.819","level":"CRT","file":"example.cpp","line":48,"thread":14164,"message":"Critical service failure: database unavailable"}
+{"timestamp":"2026-07-28T09:12:08.819","level":"INF","file":"example.cpp","line":53,"thread":14164,"message":"User Artem (ID: 42) logged in successfully"}
+{"timestamp":"2026-07-28T09:12:08.819","level":"SUC","file":"example.cpp","line":54,"thread":14164,"message":"User Artem authenticated via OAuth2"}
+{"timestamp":"2026-07-28T09:12:08.819","level":"INF","file":"example.cpp","line":57,"thread":14164,"message":"User Artem authenticated","user_id":42,"ip":"192.168.1.100"}
+{"timestamp":"2026-07-28T09:12:08.819","level":"SUC","file":"example.cpp","line":61,"thread":14164,"message":"Backup completed for Artem","size_mb":1024,"duration_sec":45}
+{"timestamp":"2026-07-28T09:12:08.819","level":"ERR","file":"example.cpp","line":65,"thread":14164,"message":"Database query failed","host":"db-primary","port":5432,"query":"SELECT * FROM users"}
+{"timestamp":"2026-07-28T09:12:08.819","level":"WRN","file":"example.cpp","line":70,"thread":14164,"message":"High memory usage","rss_mb":2048,"threshold_mb":4096}
+{"timestamp":"2026-07-28T09:12:08.819","level":"INF","file":"example.cpp","line":82,"thread":23152,"thread_name":"Worker-1","message":"Processing item 0","worker":1,"item":0}
+{"timestamp":"2026-07-28T09:12:08.819","level":"INF","file":"example.cpp","line":82,"thread":7220,"thread_name":"Worker-3","message":"Processing item 0","worker":3,"item":0}
+{"timestamp":"2026-07-28T09:12:08.819","level":"INF","file":"example.cpp","line":82,"thread":31592,"thread_name":"Worker-2","message":"Processing item 0","worker":2,"item":0}
+{"timestamp":"2026-07-28T09:12:08.840","level":"INF","file":"example.cpp","line":82,"thread":31592,"thread_name":"Worker-2","message":"Processing item 1","worker":2,"item":1}
+{"timestamp":"2026-07-28T09:12:08.840","level":"INF","file":"example.cpp","line":82,"thread":23152,"thread_name":"Worker-1","message":"Processing item 1","worker":1,"item":1}
+{"timestamp":"2026-07-28T09:12:08.840","level":"INF","file":"example.cpp","line":82,"thread":7220,"thread_name":"Worker-3","message":"Processing item 1","worker":3,"item":1}
+{"timestamp":"2026-07-28T09:12:08.856","level":"INF","file":"example.cpp","line":82,"thread":31592,"thread_name":"Worker-2","message":"Processing item 2","worker":2,"item":2}
+{"timestamp":"2026-07-28T09:12:08.856","level":"INF","file":"example.cpp","line":82,"thread":7220,"thread_name":"Worker-3","message":"Processing item 2","worker":3,"item":2}
+{"timestamp":"2026-07-28T09:12:08.856","level":"INF","file":"example.cpp","line":82,"thread":23152,"thread_name":"Worker-1","message":"Processing item 2","worker":1,"item":2}
+{"timestamp":"2026-07-28T09:12:08.872","level":"INF","file":"example.cpp","line":82,"thread":23152,"thread_name":"Worker-1","message":"Processing item 3","worker":1,"item":3}
+{"timestamp":"2026-07-28T09:12:08.872","level":"INF","file":"example.cpp","line":82,"thread":7220,"thread_name":"Worker-3","message":"Processing item 3","worker":3,"item":3}
+{"timestamp":"2026-07-28T09:12:08.872","level":"INF","file":"example.cpp","line":82,"thread":31592,"thread_name":"Worker-2","message":"Processing item 3","worker":2,"item":3}
+{"timestamp":"2026-07-28T09:12:08.887","level":"INF","file":"example.cpp","line":82,"thread":23152,"thread_name":"Worker-1","message":"Processing item 4","worker":1,"item":4}
+{"timestamp":"2026-07-28T09:12:08.887","level":"INF","file":"example.cpp","line":82,"thread":31592,"thread_name":"Worker-2","message":"Processing item 4","worker":2,"item":4}
+{"timestamp":"2026-07-28T09:12:08.887","level":"INF","file":"example.cpp","line":82,"thread":7220,"thread_name":"Worker-3","message":"Processing item 4","worker":3,"item":4}
+{"timestamp":"2026-07-28T09:12:08.903","level":"SUC","file":"example.cpp","line":88,"thread":31592,"thread_name":"Worker-2","message":"Worker-2 finished all tasks"}
+{"timestamp":"2026-07-28T09:12:08.903","level":"SUC","file":"example.cpp","line":88,"thread":23152,"thread_name":"Worker-1","message":"Worker-1 finished all tasks"}
+{"timestamp":"2026-07-28T09:12:08.903","level":"SUC","file":"example.cpp","line":88,"thread":7220,"thread_name":"Worker-3","message":"Worker-3 finished all tasks"}
+{"timestamp":"2026-07-28T09:12:08.903","level":"SUC","file":"example.cpp","line":99,"thread":14164,"thread_name":"Main","message":"All workers finished (dropped: 0 messages)"}

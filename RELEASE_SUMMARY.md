@@ -26,6 +26,9 @@ management, and more useful structured logging.
   - no closing of host `stdin/stdout/stderr`;
   - only logger-owned consoles are freed.
 - Added optional ANSI foreground and background colors.
+- Refreshed the console color palette for clearer, calmer level distinction.
+- Added console formatting options for independently showing the date, time,
+  and source file, including `HH:MM:SS:MMM` or `HH:MM:SS` time formats.
 - Added typed JSON fields for strings, booleans, integers, and floating-point
   values.
 - Hardened rotating file sinks and consolidated rotation logic.

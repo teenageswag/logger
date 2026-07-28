@@ -32,6 +32,11 @@ int main() {
     log::ConsoleConfig console_config;
     console_config.enable_colors = true;
     console_config.enable_backgrounds = true;
+    console_config.show_date = true;
+    console_config.show_time = true;
+    console_config.show_file = true;
+    console_config.time_format =
+        log::ConsoleConfig::TimeFormat::WithMilliseconds;
     log::init_console(console_config);
 
     log::info("Application started: {}", "demo");
@@ -102,7 +107,27 @@ log::init_console(config);
 ```
 
 Console output supports optional ANSI foreground and background colors. ASCII
-icons are intentionally not used.
+icons are intentionally not used. The default palette uses muted slate/violet
+for diagnostics, blue for informational messages, green for success, amber
+for warnings, and coral/red for errors.
+
+The visible parts of a console record are configurable through
+`ConsoleConfig`:
+
+```cpp
+log::ConsoleConfig config;
+config.show_date = false;  // Hide YYYY-MM-DD.
+config.show_time = true;   // Keep the clock.
+config.show_file = false;  // Hide [file.cpp:line].
+config.time_format =
+    log::ConsoleConfig::TimeFormat::WithoutMilliseconds;
+log::init_console(config);
+```
+
+`show_date` and `show_time` control the timestamp independently. The time can
+be printed as `HH:MM:SS:MMM` (`WithMilliseconds`, the default) or `HH:MM:SS`
+(`WithoutMilliseconds`). `show_file` controls both the source filename and
+line number. The level is always displayed.
 
 For DLL usage, `ConsoleSink`:
 
