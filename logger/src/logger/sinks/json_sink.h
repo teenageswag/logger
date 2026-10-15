@@ -26,3 +26,5 @@ private:
 };
 
 } // namespace log_core
+
+#include "json_sink_impl.h"

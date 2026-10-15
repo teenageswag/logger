@@ -194,6 +194,7 @@ private:
     if (!p || !p->running()) return stopped();
     if (log_core::detail::CallbackFrame::contains(p))
       return std::unexpected(Error{ErrorCode::ReentrantCall, {}});
+    if (p->only_in_debug_build() && !log_core::is_debug_build) return {};
     try { return p->add_sink(std::make_unique<T>(std::forward<Args>(args)...)); }
     catch (const std::system_error &e) {
       return std::unexpected(Error{ErrorCode::SinkFailure, e.code()});

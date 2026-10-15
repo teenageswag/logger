@@ -1,0 +1,21 @@
+#pragma once
+
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define LOGGER_DETAIL_RESTORE_LEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define LOGGER_DETAIL_RESTORE_NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#ifdef LOGGER_DETAIL_RESTORE_LEAN
+#undef WIN32_LEAN_AND_MEAN
+#undef LOGGER_DETAIL_RESTORE_LEAN
+#endif
+#ifdef LOGGER_DETAIL_RESTORE_NOMINMAX
+#undef NOMINMAX
+#undef LOGGER_DETAIL_RESTORE_NOMINMAX
+#endif
+#endif

@@ -18,15 +18,14 @@ foreach ($envLine in $envLines) {
 }
 $env:VSLANG = '1033'
 $suffix = if ($Sanitize) { '-asan' } else { '' }
-$buildDir = Join-Path $root "build\tests-$Architecture-$Configuration$suffix-msvc"
-$options = @('--fresh', '-S', $root, '-B', $buildDir, '-G', 'Ninja',
-  "-DCMAKE_BUILD_TYPE=$Configuration", '-DLOGGER_BUILD_EXAMPLE=ON')
-$ninja = Join-Path $installation 'Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe'
-$options += "-DCMAKE_MAKE_PROGRAM=$ninja"
+$buildDir = Join-Path $root "build\tests-$Architecture-$Configuration$suffix-vs"
+$platform = if ($Architecture -eq 'x86') { 'Win32' } else { 'x64' }
+$options = @('-S', $root, '-B', $buildDir, '-G', 'Visual Studio 18 2026',
+  '-A', $platform, '-DLOGGER_BUILD_EXAMPLE=ON')
 if ($Sanitize) { $options += '-DLOGGER_SANITIZE=ON' }
 & cmake @options
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
-& cmake --build $buildDir
+& cmake --build $buildDir --config $Configuration --parallel 4
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
-& ctest --test-dir $buildDir --output-on-failure
+& ctest --test-dir $buildDir -C $Configuration --output-on-failure
 exit $LASTEXITCODE

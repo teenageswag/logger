@@ -1,226 +1,187 @@
-# C++23 Async Logger
+# C++23 logger for Windows
 
-A modern asynchronous logging library for Windows and DLL-based applications.
-Log records are pushed into a bounded ring buffer and processed by a dedicated
-worker thread.
-
-## Features
-
-- C++23 API with `std::format`, `std::source_location`, and `std::jthread`;
-- asynchronous bounded queue with drop-oldest overflow policy;
-- runtime severity filtering and compile-time filtering;
-- log levels: `Trace`, `Debug`, `Info`, `Success`, `Warn`, `Error`, `Critical`;
-- console, rotating file, and JSON Lines sinks;
-- typed structured fields for JSON output;
-- optional ANSI foreground and background colors;
-- thread names and thread IDs in log records;
-- safe console ownership for injected DLLs;
-- sink error isolation and dropped-message statistics.
+Header-only logging for MSVC, applications and injected DLLs. Include
+`logger/logger.h`; no library sources need to be compiled.
 
 ## Quick start
 
 ```cpp
-#define LOG_ACTIVE_LEVEL log::Level::Trace
 #include "logger/logger.h"
 
-int main() {
-    log::Config logger_config;
-    logger_config.level = log::Level::Info;
-    logger_config.only_in_debug_build = false;
-    log::configure(logger_config);
+void initialize_logging() { // Outside DllMain.
+    log::Config config;
+    config.level = log::Level::Debug;
+    if (auto result = log::configure(config); !result) {
+        // Inspect result.error().code and result.error().system.
+        return;
+    }
 
-    log::ConsoleConfig console_config;
-    console_config.enable_colors = true;
-    console_config.enable_backgrounds = true;
-    console_config.show_date = true;
-    console_config.show_time = true;
-    console_config.show_file = true;
-    console_config.time_format =
-        log::ConsoleConfig::TimeFormat::WithMilliseconds;
-    log::init_console(console_config);
+    log::ConsoleConfig console;
+    console.auto_alloc = true; // Explicitly request a logger-owned console if needed.
+    if (!log::init_console(console)) return;
+    if (!log::add_file_sink("logs/module.log")) return;
 
-    log::info("Application started: {}", "demo");
-    log::success("Loaded {} records", 42);
-    log::warn("Disk usage is high: {}%", 87);
-    log::error("Database connection failed: {}", "db-primary");
-    log::critical("Fatal service error");
-
-    log::flush();
-    return 0;
+    log::info("Loaded {} objects", 42);
+    log::warn({{"operation", "connect"}, {"attempt", 3}}, "Retrying {}", "database");
 }
 ```
 
-## Log levels
+The default mode is **synchronous**. Calls serialize output and flush each record.
+No worker, console or files are created implicitly. Use explicit, module-specific
+paths: relative paths resolve against the host process working directory.
 
-Levels are ordered by severity:
+## DLL lifetime and manual mapping
 
-```text
-Trace < Debug < Info < Success < Warn < Error < Critical
-```
+- Initialize logging outside DllMain and global constructors.
+- Synchronous mode needs no worker join. Normal CRT cleanup closes sinks and
+  releases a console allocated by the logger, unless free_owned_console is false.
+- Stop hooks/producers before unloading their DLL. No logger can keep executing
+  code from a module after its memory has been unmapped.
+- A manual mapper must initialize the C++ runtime, TLS and exception/unwind support,
+  and execute module cleanup. Calling only DllMain is insufficient. No particular
+  mapper is assumed or certified by this library.
+- Avoid ordinary logging in DllMain, allocator hooks and crash/SEH handlers: it
+  uses allocation, locks and I/O. This is not a crash-safe or real-time logger.
+- One default logger exists per module, not per process. Do not pass STL objects
+  or sink ownership between modules built with incompatible CRT/ABI settings.
+- Records own their text, fields and thread name. source_location names belong to
+  the calling module; it must remain loaded until its records are processed.
+- Late default-facade calls after its destruction are ignored. Explicit Logger
+  objects must outlive every caller.
 
-Use `log::set_level()` or `Config::level` to set the runtime threshold.
-`Error` and `Critical` are written to stderr/`CONOUT$` and trigger an immediate
-sink flush.
-
-## Central configuration
-
-Logger-wide options are configured through `log::Config`:
+## Asynchronous mode
 
 ```cpp
 log::Config config;
-config.level = log::Level::Trace;
-config.only_in_debug_build = true;
+config.mode = log::Mode::Asynchronous;
 config.queue_capacity = 4096;
-log::configure(config);
+config.max_queue_bytes = 8 * 1024 * 1024;
+config.max_record_bytes = 64 * 1024;
+config.max_fields = 32;
+config.flush_interval = std::chrono::milliseconds(1000);
+config.overflow = log::OverflowPolicy::DropOldest;
+if (!log::configure(config)) return;
+// Add sinks, then start producers.
 ```
 
-### Debug-only builds
+Choose the mode before the first accepted log attempt. The worker starts lazily.
+Before unloading an asynchronous logger's DLL, stop its producers and call
+`log::shutdown()` **outside DllMain**. All concurrent shutdown callers wait for
+completion. Shutdown drains the queue, flushes and destroys sinks; it is terminal.
+Never wait for a worker from DLL_PROCESS_DETACH.
 
-When `only_in_debug_build` is `true`:
+The queue uses a mutex and never waits for free queue space. DropOldest discards
+old pending records; DropNewest rejects the new record. Either policy can lose
+Error/Critical records under overload. Inspect the return value and statistics.
+The byte budget counts text, thread names, field objects, keys and string values;
+queue object storage, spare string capacity and the worker's fixed 256-record
+batch are additional memory. Caller arguments/custom formatters may allocate.
 
-- Debug builds (`_DEBUG`) log normally and may create a console;
-- Release builds do not create a logger console;
-- existing logger-owned consoles are released;
-- all log calls are rejected before `std::format` is executed.
+`flush()` returns a checked result after all prior accepted records have been
+processed or accounted as dropped and sink flushes have completed. Concurrent
+producers may continue. A failed earlier asynchronous write is reported through
+statistics/last_error, even if a later flush succeeds. Flush is not a guarantee
+of stable-media persistence or delivery after process termination.
 
-When it is `false`, logging is available in every build configuration.
+Async sinks flush on the configured timer even while idle. An interval of zero
+disables periodic flushing; Error/Critical still request a flush after their batch.
 
-This removes the need to wrap every call manually:
+## Levels and filtering
+
+`Trace < Debug < Info < Success < Warn < Error < Critical < Off`.
+Use set_level for the logger; use Sink::set_level before transferring a sink
+to select its own threshold. Off disables all records.
+
+Ordinary functions filter formatting but C++ evaluates their arguments first.
+Use call-site macros to skip argument evaluation and compile out levels:
 
 ```cpp
-// No #ifdef _DEBUG is required.
-log::info("Detailed diagnostic information");
+#define LOG_ACTIVE_LEVEL ::log::Level::Info
+#include "logger/logger.h"
+LOG_DEBUG("{}", expensive_diagnostics()); // No evaluation.
+LOG_INFO({{"count", expensive_count()}}, "Snapshot"); // Runtime guard first.
 ```
 
-`LOG_ACTIVE_LEVEL` remains available for compile-time removal of lower levels.
-
-## Console logging
+LOG_ACTIVE_LEVEL affects **only LOG_TRACE/DEBUG/INFO/SUCCESS/WARN/ERROR/CRITICAL**.
+It may differ between translation units because it does not change shared inline
+definitions. Function calls such as log::debug use runtime filtering.
 
 ```cpp
-log::ConsoleConfig config;
-config.auto_alloc = true;
-config.enable_colors = true;
-config.enable_backgrounds = true;
-config.show_thread_name = true;
-config.show_thread_id = false;
-log::init_console(config);
+log::lazy(log::Level::Debug, [&] {
+    return std::format("Snapshot: {}", expensive_diagnostics());
+});
+log::text(log::Level::Info, runtime_text); // Braces are literal text.
 ```
 
-Console output supports optional ANSI foreground and background colors. ASCII
-icons are intentionally not used. The default palette uses muted slate/violet
-for diagnostics, blue for informational messages, green for success, amber
-for warnings, and coral/red for errors.
+All seven levels accept either format + arguments or Fields + format + arguments.
+The *_ctx compatibility functions accept already-created text and fields.
+only_in_debug_build gates records and built-in sink creation in Release (_DEBUG
+is absent). It is a runtime policy, not compile-time argument removal.
 
-The visible parts of a console record are configurable through
-`ConsoleConfig`:
+## Sinks and encoding
+
+- Console output contains optional date/time/source, thread name/ID, level,
+  message and fields. Error/Critical use stderr; other levels use stdout.
+- Actual Windows consoles use WriteConsoleW; redirected streams receive UTF-8.
+  Invalid UTF-8 console input is replaced with U+FFFD.
+- Existing console code pages, title, dimensions and output mode are left alone
+  by default. modify_host_console explicitly permits title/size/VT changes.
+  Owned consoles enable VT when supported. force_ansi permits ANSI explicitly.
+- Console allocation is process-wide. The logger restores the process standard
+  handle table after allocation and never closes host CRT streams. Only handles
+  it opened are closed; only its own console is detached.
+- File and JSON sinks rotate by size. A zero max_size disables rotation.
+  max_files=0 truncates on rotation and keeps no backups. One oversized record
+  is allowed in an empty file. One writer must own an active path and its backups.
+- JSON Lines uses UTC timestamps ending in Z, typed values, sequence/thread/source
+  metadata and a nested fields object. Duplicate user keys use the last value.
+  Non-finite numbers become null; invalid UTF-8 is replaced.
+
+Creation/configuration/flush functions return std::expected<void, Error>.
+Logging returns bool: in async mode true means admission, in sync mode a
+successful write/flush attempt. False may also mean a filtered record.
+Library-owned formatting/allocation failures are caught; evaluation of arguments
+and construction of Fields before the call remain the caller's responsibility.
+
+Custom Sink::write/flush exceptions are isolated and counted. Callbacks execute
+serially under the sink lock. Reentrant log/control calls into the same logger
+are rejected. Custom sinks used directly must provide their own synchronization;
+destructors must not throw. A sink that blocks forever also blocks shutdown.
+
+## Independent instances and statistics
 
 ```cpp
-log::ConsoleConfig config;
-config.show_date = false;  // Hide YYYY-MM-DD.
-config.show_time = true;   // Keep the clock.
-config.show_file = false;  // Hide [file.cpp:line].
-config.time_format =
-    log::ConsoleConfig::TimeFormat::WithoutMilliseconds;
-log::init_console(config);
+log_core::Logger logger; // No global state or implicit sinks.
+auto sink = std::make_unique<log_core::FileSink>(module_path); // May throw.
+sink->set_level(log::Level::Warn);
+if (!logger.add_sink(std::move(sink))) return;
+logger.write<log::Level::Warn>("Operation {} failed", 17);
+auto stats = logger.statistics();
+auto error = logger.last_error();
 ```
 
-`show_date` and `show_time` control the timestamp independently. The time can
-be printed as `HH:MM:SS:MMM` (`WithMilliseconds`, the default) or `HH:MM:SS`
-(`WithoutMilliseconds`). `show_file` controls both the source filename and
-line number. The level is always displayed.
+Statistics include accepted/processed/dropped/rejected records, per-level drops,
+sink errors, queue payload bytes and high-water mark. Snapshots during production
+are observational; accounting identities should be checked after shutdown.
+Thread names are UTF-8, limited to 128 bytes at a character boundary.
+set_queue_capacity preserves newest pending records and accounts evictions.
+Invalid configurations leave existing settings unchanged.
 
-For DLL usage, `ConsoleSink`:
+## Build and verification
 
-- allocates a console only when `auto_alloc` is enabled and no console exists;
-- tracks whether the console was created by the logger;
-- closes only its own `CONOUT$` handles;
-- never calls `freopen_s` for the host process;
-- never closes or replaces the host's `stdin`, `stdout`, or `stderr`;
-- frees only a console owned by the logger.
+Use MSVC with a C++23-capable standard library (std::expected/std::formattable),
+/EHsc and /utf-8. The checked local toolchain is MSVC 19.51 / v145.
+The original .cpp files are compatibility shims and can be removed from builds.
+The logger/logger_include.h forwarding header is retained.
 
-Call `log::shutdown()` before unloading a DLL when possible.
-
-## File logging
-
-```cpp
-log::add_file_sink("logs/app.log", 5 * 1024 * 1024, 3);
+```powershell
+./tests/run.ps1 -Configuration Debug
+./tests/run.ps1 -Configuration Release
+./tests/run.ps1 -Configuration Release -Architecture x86
+./tests/run.ps1 -Configuration Release -Sanitize
 ```
 
-The file sink supports size-based rotation. Parent directories are created
-automatically.
-
-- `max_size == 0` disables size-based rotation;
-- `max_files == 0` disables rotation backups;
-- filesystem errors are detected instead of being silently ignored.
-
-## JSON logging
-
-```cpp
-log::add_json_sink("logs/events.json", 10 * 1024 * 1024, 3);
-```
-
-JSON Lines records include timestamp, level, source file, line, thread data,
-message text, and structured fields. Structured values preserve their JSON
-types:
-
-```cpp
-log::info({{"user_id", 42}, {"admin", true}, {"latency_ms", 12.5}},
-          "User authenticated");
-```
-
-## Thread names and statistics
-
-```cpp
-log::set_thread_name("Worker-1");
-
-const auto dropped = log::dropped_count();
-const auto sink_errors = log::sink_error_count();
-```
-
-Thread metadata is captured when the record is created, so it remains correct
-even though sinks run on a background worker thread.
-
-## Lifecycle and queue control
-
-```cpp
-log::flush();
-log::set_queue_capacity(4096);
-log::shutdown();
-```
-
-`shutdown()` stops the worker, drains queued records, flushes sinks, and makes
-subsequent log calls no-ops. The queue never accepts a zero capacity.
-
-## Custom sinks
-
-```cpp
-class MySink final : public log::Sink {
-public:
-    void write(const log_core::LogMessage& message) override {
-        // Custom output.
-    }
-
-    void flush() override {}
-};
-
-log::add_sink(std::make_unique<MySink>());
-```
-
-Exceptions from one sink are isolated and counted by `sink_error_count()` so a
-broken sink cannot terminate the logging worker.
-
-## Project layout
-
-```text
-logger/src/logger/logger.h
-logger/src/logger/core/types.h
-logger/src/logger/core/logger.h/.cpp
-logger/src/logger/sinks/sink.h
-logger/src/logger/sinks/rotating_file.h
-logger/src/logger/sinks/console_sink.h/.cpp
-logger/src/logger/sinks/file_sink.h/.cpp
-logger/src/logger/sinks/json_sink.h/.cpp
-```
-
-`logger_include.h` remains as a compatibility forwarding header. New code
-should include `logger/logger.h`.
+CMake exposes an INTERFACE logger target. The test runner uses VS 2026 Build Tools.
+Tests cover queue overflow/resize, delivery barriers, shutdown, reentrancy,
+formatting failures, payload limits, idle flush, sink failures, rotation, JSON,
+redirected console output and multiple translation units.

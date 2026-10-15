@@ -175,3 +175,5 @@ private:
 };
 
 } // namespace log_core
+
+#include "logger_impl.h"

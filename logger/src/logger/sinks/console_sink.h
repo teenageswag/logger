@@ -58,3 +58,5 @@ private:
 };
 
 } // namespace log_core
+
+#include "console_sink_impl.h"

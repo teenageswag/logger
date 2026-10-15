@@ -23,20 +23,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\example\main.cpp">
+    <ClCompile Include="src\example.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\logger\core\logger.cpp">
-      <Filter>Source Files\core</Filter>
-    </ClCompile>
-    <ClCompile Include="src\logger\sinks\console_sink.cpp">
-      <Filter>Source Files\sinks</Filter>
-    </ClCompile>
-    <ClCompile Include="src\logger\sinks\file_sink.cpp">
-      <Filter>Source Files\sinks</Filter>
-    </ClCompile>
-    <ClCompile Include="src\logger\sinks\json_sink.cpp">
-      <Filter>Source Files\sinks</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
