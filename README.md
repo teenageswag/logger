@@ -3,7 +3,7 @@
 A header-only C++23 logger for Windows and MSVC. Console output, rotating files
 and JSON Lines, with synchronous or bounded asynchronous delivery.
 
-[Quick start](#quick-start) · [Sinks](#sinks) · [Async mode](#async-mode) · [Guide](docs/guide.md) · [Benchmarks](benchmarks/README.md)
+[Quick start](#quick-start) · [Sinks](#sinks) · [Async mode](#async-mode) · [Guide](docs/guide.md)
 
 ![Example console output: an info message, a successful initialization with 12 hooks, and a connection retry with a structured attempt field.](docs/assets/console.svg)
 
