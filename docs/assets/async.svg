@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="248" viewBox="0 0 960 248" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Asynchronous logging pipeline</title>
+  <desc id="desc">On the calling thread, filter and format a record. Hand it to a queue bounded by record count and payload bytes. A worker drains the queue and writes to console, text file and JSON Lines sinks. On overflow, DropOldest or DropNewest applies. Producers never wait for free queue space; they still use locks.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0L6 3L0 6" fill="#8B949E"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="959" height="247" rx="16" fill="#0D1117" stroke="#30363D"/>
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <text x="28" y="34" fill="#8B949E" font-size="13">Async mode</text>
+    <text x="932" y="34" fill="#8B949E" font-size="13" text-anchor="end">Formatting on caller · I/O on worker</text>
+    <rect x="28.5" y="65.5" width="211" height="104" rx="10" fill="#161B22" stroke="#30363D"/>
+    <text x="46" y="96" fill="#E6EDF3" font-size="18" font-weight="600">Caller</text>
+    <text x="46" y="126" fill="#ADB6C2" font-size="14">Filter level</text>
+    <text x="46" y="148" fill="#ADB6C2" font-size="14">Format and own record</text>
+    <path d="M252 117.5H286" stroke="#8B949E" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="300.5" y="65.5" width="211" height="104" rx="10" fill="#111F30" stroke="#38618A"/>
+    <text x="318" y="96" fill="#79B8FF" font-size="18" font-weight="600">Bounded queue</text>
+    <text x="318" y="126" fill="#ADB6C2" font-size="14">Record count + payload</text>
+    <text x="318" y="148" fill="#ADB6C2" font-size="14">Default: 4096 / 8 MiB</text>
+    <path d="M524 117.5H558" stroke="#8B949E" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <rect x="572.5" y="65.5" width="359" height="104" rx="10" fill="#161B22" stroke="#30363D"/>
+    <text x="590" y="96" fill="#E6EDF3" font-size="18" font-weight="600">Worker</text>
+    <text x="590" y="126" fill="#ADB6C2" font-size="14">Drain queue → write sinks</text>
+    <text x="590" y="148" fill="#ADB6C2" font-size="14">Console · Text file · JSON Lines</text>
+    <path d="M28 192.5H932" stroke="#30363D"/>
+    <text x="28" y="222" fill="#ADB6C2" font-size="13">Overflow: DropOldest / DropNewest</text>
+    <text x="932" y="222" fill="#ADB6C2" font-size="13" text-anchor="end">No waiting for free queue space</text>
+  </g>
+</svg>

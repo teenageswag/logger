@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="242" viewBox="0 0 960 242" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Console output</title>
+  <desc id="desc">Example output with date and source hidden: Loaded 42 objects at Info level, Ready at Success level with hooks=12, and Retrying connection at Warn level with attempt=2. All records are from the main thread.</desc>
+  <rect x="0.5" y="0.5" width="959" height="241" rx="16" fill="#0D1117" stroke="#30363D"/>
+  <path d="M1 53.5H959" stroke="#30363D"/>
+  <g fill="#8B949E" font-family="Segoe UI, Arial, sans-serif" font-size="13">
+    <text x="28" y="33">Console preview</text>
+    <text x="932" y="33" text-anchor="end">time · level · thread · message · fields</text>
+  </g>
+  <g font-family="Consolas, 'Liberation Mono', monospace" font-size="17" xml:space="preserve">
+    <text x="28" y="104" fill="#60A5FA">[12:41:08:102] [INF] [main] Loaded 42 objects</text>
+    <text x="28" y="148" fill="#34D399">[12:41:08:103] [SUC] [main] Ready {hooks=12}</text>
+    <text x="28" y="192" fill="#FBBF24">[12:41:08:104] [WRN] [main] Retrying connection {attempt=2}</text>
+  </g>
+</svg>
