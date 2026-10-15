@@ -3,12 +3,13 @@
 #include <chrono>
 #include <concepts>
 #include <cstddef>
-#include <stdexcept>
 #include <cstdint>
 #include <ctime>
 #include <format>
 #include <initializer_list>
+#include <iterator>
 #include <source_location>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -30,18 +31,15 @@ enum class Level : uint8_t {
   Off,
 };
 
-using FieldValue =
-    std::variant<std::string, bool, int64_t, uint64_t, double>;
+using FieldValue = std::variant<std::string, bool, int64_t, uint64_t, double>;
 
 struct Field {
   std::string key;
   FieldValue value;
 
   Field(std::string k, const char *v) : key(std::move(k)), value(std::string(v ? v : "")) {}
-  Field(std::string k, std::string v)
-      : key(std::move(k)), value(std::move(v)) {}
-  Field(std::string k, std::string_view v)
-      : key(std::move(k)), value(std::string(v)) {}
+  Field(std::string k, std::string v) : key(std::move(k)), value(std::move(v)) {}
+  Field(std::string k, std::string_view v) : key(std::move(k)), value(std::string(v)) {}
   Field(std::string k, bool v) : key(std::move(k)), value(v) {}
 
   template <typename T>
@@ -51,8 +49,7 @@ struct Field {
 
   template <typename T>
     requires(std::is_floating_point_v<std::remove_cvref_t<T>>)
-  Field(std::string k, T v)
-      : key(std::move(k)), value(static_cast<double>(v)) {}
+  Field(std::string k, T v) : key(std::move(k)), value(static_cast<double>(v)) {}
 
   template <typename T>
     requires(!std::is_integral_v<std::remove_cvref_t<T>> &&
@@ -62,12 +59,10 @@ struct Field {
              !std::is_same_v<std::remove_cvref_t<T>, std::string> &&
              !std::is_same_v<std::remove_cvref_t<T>, std::string_view> &&
              std::formattable<const T &, char>)
-  Field(std::string k, const T &v)
-      : key(std::move(k)), value(std::format("{}", v)) {}
+  Field(std::string k, const T &v) : key(std::move(k)), value(std::format("{}", v)) {}
 
 private:
-  template <typename T>
-  static FieldValue make_integer(T value) {
+  template <typename T> static FieldValue make_integer(T value) {
     if constexpr (std::is_signed_v<T>)
       return static_cast<int64_t>(value);
     else
@@ -92,8 +87,7 @@ template <> struct is_fields<Fields> : std::true_type {};
 template <> struct is_fields<Fields &> : std::true_type {};
 template <> struct is_fields<const Fields &> : std::true_type {};
 template <> struct is_fields<Fields &&> : std::true_type {};
-template <typename T>
-inline constexpr bool is_fields_v = is_fields<std::remove_cvref_t<T>>::value;
+template <typename T> inline constexpr bool is_fields_v = is_fields<std::remove_cvref_t<T>>::value;
 
 struct LogMessage {
   Level level = Level::Info;
@@ -183,9 +177,9 @@ inline std::string_view level_to_background_color(Level level) noexcept {
 
 inline constexpr std::string_view reset_color = "\x1b[0m";
 
-inline bool get_time_info(std::chrono::system_clock::time_point tp,
-                          struct tm &tm_info) noexcept {
-  const auto time = std::chrono::system_clock::to_time_t(std::chrono::floor<std::chrono::seconds>(tp));
+inline bool get_time_info(std::chrono::system_clock::time_point tp, struct tm &tm_info) noexcept {
+  const auto time =
+      std::chrono::system_clock::to_time_t(std::chrono::floor<std::chrono::seconds>(tp));
 #if defined(_WIN32)
   return localtime_s(&tm_info, &time) == 0;
 #else
@@ -195,52 +189,73 @@ inline bool get_time_info(std::chrono::system_clock::time_point tp,
 
 inline std::tm checked_local_time(std::chrono::system_clock::time_point tp) {
   std::tm result{};
-  if (!get_time_info(tp, result)) throw std::range_error("log timestamp outside localtime range");
+  if (!get_time_info(tp, result))
+    throw std::range_error("log timestamp outside localtime range");
   return result;
 }
 
 inline auto milliseconds_part(std::chrono::system_clock::time_point tp) noexcept {
   return (std::chrono::floor<std::chrono::milliseconds>(tp) -
-          std::chrono::floor<std::chrono::seconds>(tp)).count();
+          std::chrono::floor<std::chrono::seconds>(tp))
+      .count();
+}
+
+inline void append_local_timestamp(std::string &output, std::chrono::system_clock::time_point tp,
+                                   bool show_date = true, bool show_time = true,
+                                   bool with_milliseconds = true, char separator = '.') {
+  const auto tm = checked_local_time(tp);
+  auto out = std::back_inserter(output);
+  if (show_date)
+    std::format_to(out, "{:04}-{:02}-{:02}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+  if (show_date && show_time)
+    output += ' ';
+  if (show_time) {
+    std::format_to(out, "{:02}:{:02}:{:02}", tm.tm_hour, tm.tm_min, tm.tm_sec);
+    if (with_milliseconds)
+      std::format_to(out, "{}{:03}", separator, milliseconds_part(tp));
+  }
 }
 
 inline std::string format_date(std::chrono::system_clock::time_point tp) {
-  const auto tm = checked_local_time(tp);
-  return std::format("{:04}-{:02}-{:02}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+  std::string result;
+  append_local_timestamp(result, tp, true, false);
+  return result;
 }
 
 inline std::string format_time(std::chrono::system_clock::time_point tp,
                                bool with_milliseconds = true) {
-  const auto tm = checked_local_time(tp);
-  if (with_milliseconds)
-    return std::format("{:02}:{:02}:{:02}:{:03}", tm.tm_hour, tm.tm_min, tm.tm_sec,
-                       milliseconds_part(tp));
-  return std::format("{:02}:{:02}:{:02}", tm.tm_hour, tm.tm_min, tm.tm_sec);
+  std::string result;
+  append_local_timestamp(result, tp, false, true, with_milliseconds, ':');
+  return result;
 }
 
 inline std::string format_timestamp(std::chrono::system_clock::time_point tp) {
-  const auto tm = checked_local_time(tp);
-  return std::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:03}",
-      tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
-      milliseconds_part(tp));
+  std::string result;
+  append_local_timestamp(result, tp);
+  return result;
 }
 
-inline std::string format_iso_timestamp(std::chrono::system_clock::time_point tp) {
+inline void append_iso_timestamp(std::string &output, std::chrono::system_clock::time_point tp) {
   using namespace std::chrono;
   // Calendar arithmetic handles pre-epoch timestamps without the CRT localtime limits.
   const auto ms = floor<milliseconds>(tp.time_since_epoch());
   const auto day = floor<days>(ms);
   const year_month_day date{sys_days{day}};
   const hh_mm_ss time{ms - day};
-  return std::format("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
-      static_cast<int>(date.year()), static_cast<unsigned>(date.month()),
-      static_cast<unsigned>(date.day()), time.hours().count(), time.minutes().count(),
-      time.seconds().count(), time.subseconds().count());
+  std::format_to(std::back_inserter(output), "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+                 static_cast<int>(date.year()), static_cast<unsigned>(date.month()),
+                 static_cast<unsigned>(date.day()), time.hours().count(), time.minutes().count(),
+                 time.seconds().count(), time.subseconds().count());
+}
+
+inline std::string format_iso_timestamp(std::chrono::system_clock::time_point tp) {
+  std::string result;
+  append_iso_timestamp(result, tp);
+  return result;
 }
 
 inline std::string_view shorten_filename(std::string_view filename) noexcept {
-  if (const auto pos = filename.find_last_of("/\\");
-      pos != std::string_view::npos)
+  if (const auto pos = filename.find_last_of("/\\"); pos != std::string_view::npos)
     return filename.substr(pos + 1);
   return filename;
 }
@@ -259,19 +274,33 @@ inline std::string field_value_to_string(const FieldValue &value) {
       value);
 }
 
-inline std::string format_fields(const std::vector<Field> &fields) {
+inline void append_fields(std::string &output, const std::vector<Field> &fields) {
   if (fields.empty())
-    return {};
-
-  std::string result = " {";
-  for (size_t i = 0; i < fields.size(); ++i) {
-    if (i > 0)
-      result += ", ";
-    result += fields[i].key;
-    result += '=';
-    result += field_value_to_string(fields[i].value);
+    return;
+  output += " {";
+  bool first = true;
+  for (const auto &field : fields) {
+    if (!first)
+      output += ", ";
+    first = false;
+    output += field.key;
+    output += '=';
+    std::visit(
+        [&](const auto &value) {
+          using T = std::remove_cvref_t<decltype(value)>;
+          if constexpr (std::is_same_v<T, std::string>)
+            output += value;
+          else
+            std::format_to(std::back_inserter(output), "{}", value);
+        },
+        field.value);
   }
-  result += '}';
+  output += '}';
+}
+
+inline std::string format_fields(const std::vector<Field> &fields) {
+  std::string result;
+  append_fields(result, fields);
   return result;
 }
 
@@ -284,9 +313,8 @@ template <typename... Args> struct log_format_string {
   std::source_location loc;
 
   template <typename String>
-  consteval log_format_string(
-      const String &s,
-      const std::source_location &l = std::source_location::current())
+  consteval log_format_string(const String &s,
+                              const std::source_location &l = std::source_location::current())
       : fmt(s), loc(l) {}
 };
 

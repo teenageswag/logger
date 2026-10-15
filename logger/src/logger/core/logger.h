@@ -1,8 +1,8 @@
 #pragma once
 
+#include "../sinks/sink.h"
 #include "error.h"
 #include "types.h"
-#include "../sinks/sink.h"
 
 #include <array>
 #include <atomic>
@@ -44,19 +44,24 @@ struct Statistics {
 
 namespace detail {
 // Trivial TLS avoids destructors running after module teardown.
-struct ThreadName { std::array<char, 128> bytes{}; size_t size = 0; };
+struct ThreadName {
+  std::array<char, 128> bytes{};
+  size_t size = 0;
+};
 inline thread_local ThreadName thread_name;
 inline std::atomic<bool> default_logger_destroyed{false};
 struct CallbackFrame {
   const void *logger;
   CallbackFrame *previous;
   static inline thread_local CallbackFrame *current = nullptr;
-  explicit CallbackFrame(const void *owner) noexcept
-      : logger(owner), previous(current) { current = this; }
+  explicit CallbackFrame(const void *owner) noexcept : logger(owner), previous(current) {
+    current = this;
+  }
   ~CallbackFrame() { current = previous; }
   static bool contains(const void *owner) noexcept {
     for (auto *frame = current; frame; frame = frame->previous)
-      if (frame->logger == owner) return true;
+      if (frame->logger == owner)
+        return true;
     return false;
   }
 };
@@ -89,10 +94,10 @@ public:
   Result remove_console_sinks();
   Result init_console(ConsoleSinkConfig config);
   bool enqueue(Level level, const std::source_location &loc, std::string_view text) noexcept;
-  bool enqueue_with_fields(Level level, const std::source_location &loc,
-                           std::string_view text, std::vector<Field> fields) noexcept;
-  bool enqueue_owned(Level level, const std::source_location &loc,
-                      std::string text, std::vector<Field> fields = {}) noexcept;
+  bool enqueue_with_fields(Level level, const std::source_location &loc, std::string_view text,
+                           std::vector<Field> fields) noexcept;
+  bool enqueue_owned(Level level, const std::source_location &loc, std::string text,
+                     std::vector<Field> fields = {}) noexcept;
 
   template <Level L, typename... Args>
   bool write(log_format_string<std::type_identity_t<Args>...> fmt, Args &&...args) noexcept {
@@ -102,27 +107,40 @@ public:
   template <Level L, typename... Args>
   bool write_fields(Fields fields, log_format_string<std::type_identity_t<Args>...> fmt,
                     Args &&...args) noexcept {
-    if (!enabled(L)) return false;
-    if (in_callback()) return reject(ErrorCode::ReentrantCall);
+    if (!enabled(L))
+      return false;
+    if (in_callback())
+      return reject(ErrorCode::ReentrantCall);
     try {
       std::string text;
       const auto limit = max_record_bytes_.load(std::memory_order_relaxed);
-      const auto result = std::format_to_n(std::back_inserter(text),
-          static_cast<std::ptrdiff_t>(limit), fmt.fmt, std::forward<Args>(args)...);
-      if (static_cast<size_t>(result.size) > limit) return reject(ErrorCode::RecordTooLarge);
+      const auto result =
+          std::format_to_n(std::back_inserter(text), static_cast<std::ptrdiff_t>(limit), fmt.fmt,
+                           std::forward<Args>(args)...);
+      if (static_cast<size_t>(result.size) > limit)
+        return reject(ErrorCode::RecordTooLarge);
       return enqueue_owned(L, fmt.loc, std::move(text), std::move(fields.values));
-    } catch (const std::bad_alloc &) { return reject(ErrorCode::AllocationFailed); }
-      catch (...) { return reject(ErrorCode::FormattingFailed); }
+    } catch (const std::bad_alloc &) {
+      return reject(ErrorCode::AllocationFailed);
+    } catch (...) {
+      return reject(ErrorCode::FormattingFailed);
+    }
   }
 
   template <typename Factory>
   bool lazy(Level level, Factory &&make_text,
             std::source_location loc = std::source_location::current()) noexcept {
-    if (!enabled(level)) return false;
-    if (in_callback()) return reject(ErrorCode::ReentrantCall);
-    try { return enqueue_owned(level, loc, std::string(std::forward<Factory>(make_text)())); }
-    catch (const std::bad_alloc &) { return reject(ErrorCode::AllocationFailed); }
-    catch (...) { return reject(ErrorCode::FormattingFailed); }
+    if (!enabled(level))
+      return false;
+    if (in_callback())
+      return reject(ErrorCode::ReentrantCall);
+    try {
+      return enqueue_owned(level, loc, std::string(std::forward<Factory>(make_text)()));
+    } catch (const std::bad_alloc &) {
+      return reject(ErrorCode::AllocationFailed);
+    } catch (...) {
+      return reject(ErrorCode::FormattingFailed);
+    }
   }
 
   uint32_t get_thread_id() const noexcept;

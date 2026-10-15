@@ -13,10 +13,12 @@ struct Capture final : log::Sink {
   void flush() override {}
 };
 int main() {
-  if (address_a() != address_b() || disabled_callsite() != 0 || enabled_callsite() != 1) return 1;
+  if (address_a() != address_b() || disabled_callsite() != 0 || enabled_callsite() != 1)
+    return 1;
   auto sink = std::make_unique<Capture>();
   auto *view = sink.get();
-  if (!log::add_sink(std::move(sink))) return 2;
+  if (!log::add_sink(std::move(sink)))
+    return 2;
   log::set_level(log::Level::Trace);
   const auto line = __LINE__ + 1;
   log::warn({{"id", 7}}, "structured {}", 42);
@@ -26,12 +28,18 @@ int main() {
   log::error({{"id", 4}}, "error");
   log::critical({{"id", 5}}, "critical");
   if (view->messages.size() != 6 || view->messages[0].loc.line() != line ||
-      view->messages[0].text != "structured 42") return 3;
+      view->messages[0].text != "structured 42")
+    return 3;
   log::set_level(log::Level::Off);
   int calls = 0;
   LOG_CRITICAL("{}", ++calls);
-  log::lazy(log::Level::Info, [&] { ++calls; return "unused"; });
-  if (calls) return 4;
-  if (!log::shutdown() || log::info("after stop")) return 5;
+  log::lazy(log::Level::Info, [&] {
+    ++calls;
+    return "unused";
+  });
+  if (calls)
+    return 4;
+  if (!log::shutdown() || log::info("after stop"))
+    return 5;
   std::cout << "PASS header-only, ODR, call-site filtering and fields API\n";
 }

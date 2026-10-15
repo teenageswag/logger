@@ -1,7 +1,7 @@
 #pragma once
 
-#include "sink.h"
 #include "rotating_file.h"
+#include "sink.h"
 
 #include <filesystem>
 

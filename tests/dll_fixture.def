@@ -1,0 +1,4 @@
+LIBRARY logger_fixture
+EXPORTS
+  run_logger
+  stop_logger

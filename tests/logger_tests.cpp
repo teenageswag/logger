@@ -1,6 +1,8 @@
 #include "logger/logger.h"
+#include <deque>
 #include <fstream>
 #include <limits>
+#include <random>
 #if defined(_WIN32)
 #include <io.h>
 #endif
@@ -10,8 +12,11 @@
 
 using namespace log_core;
 using namespace std::chrono_literals;
-#define CHECK(expression) do { if (!(expression)) \
-  throw std::runtime_error("check failed: " #expression); } while (false)
+#define CHECK(expression)                                                                          \
+  do {                                                                                             \
+    if (!(expression))                                                                             \
+      throw std::runtime_error("check failed: " #expression);                                      \
+  } while (false)
 
 struct Shared {
   std::vector<LogMessage> records;
@@ -33,11 +38,13 @@ struct Gate : Capture {
     Capture::write(m);
     if (m.text == "gate") {
       entered.release();
-      if (!release.try_acquire_for(10s)) throw std::runtime_error("gate timeout");
+      if (!release.try_acquire_for(10s))
+        throw std::runtime_error("gate timeout");
     }
     if (second && m.text == "C") {
       second_entered.release();
-      if (!second_release.try_acquire_for(10s)) throw std::runtime_error("gate timeout");
+      if (!second_release.try_acquire_for(10s))
+        throw std::runtime_error("gate timeout");
     }
   }
 };
@@ -53,11 +60,13 @@ void put(Logger &logger, std::string_view text) {
 void check_text(const Shared &data, std::initializer_list<std::string_view> expected) {
   CHECK(data.records.size() == expected.size());
   size_t i = 0;
-  for (auto text : expected) CHECK(data.records[i++].text == text);
+  for (auto text : expected)
+    CHECK(data.records[i++].text == text);
 }
 void queue_test(std::string_view test) {
   auto config = async_config(3);
-  if (test == "drop_newest") config.overflow = OverflowPolicy::DropNewest;
+  if (test == "drop_newest")
+    config.overflow = OverflowPolicy::DropNewest;
   Logger logger(config);
   auto data = std::make_shared<Shared>();
   auto gate = std::make_unique<Gate>(data);
@@ -66,7 +75,8 @@ void queue_test(std::string_view test) {
   CHECK(logger.add_sink(std::move(gate)));
   put(logger, "gate");
   CHECK(control->entered.try_acquire_for(5s));
-  for (auto text : {"A", "B", "C"}) put(logger, text);
+  for (auto text : {"A", "B", "C"})
+    put(logger, text);
   for (auto text : {"D", "E"}) {
     const bool ok = logger.enqueue(Level::Info, std::source_location::current(), text);
     CHECK(ok == (test != "drop_newest"));
@@ -84,9 +94,12 @@ void queue_test(std::string_view test) {
     control->second_release.release();
   }
   CHECK(logger.shutdown());
-  if (test == "ring") check_text(*data, {"gate", "C", "D", "E", "F"});
-  else if (test == "resize") check_text(*data, {"gate", "D", "E"});
-  else check_text(*data, {"gate", "A", "B", "C"});
+  if (test == "ring")
+    check_text(*data, {"gate", "C", "D", "E", "F"});
+  else if (test == "resize")
+    check_text(*data, {"gate", "D", "E"});
+  else
+    check_text(*data, {"gate", "A", "B", "C"});
   CHECK(data->destroyed);
   CHECK(logger.dropped_count() == (test == "resize" ? 3u : 2u));
   CHECK(logger.statistics().dropped_by_level[static_cast<size_t>(Level::Info)] ==
@@ -112,7 +125,8 @@ void shutdown_test() {
     CHECK(logger.flush());
     std::jthread a([&] { CHECK(logger.shutdown()); });
     std::jthread b([&] { CHECK(logger.shutdown()); });
-    a.join(); b.join();
+    a.join();
+    b.join();
     CHECK(data->destroyed);
     CHECK(!logger.enabled(Level::Info));
     CHECK(!logger.add_sink(std::make_unique<Capture>(data)));
@@ -125,7 +139,8 @@ void shutdown_test() {
   std::vector<std::jthread> producers;
   for (int thread = 0; thread < 4; ++thread)
     producers.emplace_back([&, thread] {
-      for (int i = 0; i < 1000; ++i) CHECK(logger.write<Level::Info>("{}:{}", thread, i));
+      for (int i = 0; i < 1000; ++i)
+        CHECK(logger.write<Level::Info>("{}:{}", thread, i));
     });
   producers.clear();
   CHECK(logger.shutdown());
@@ -156,11 +171,15 @@ void reentrant_test() {
   CHECK(view->checked);
   CHECK(logger.statistics().rejected == 2);
 }
-struct Marker { Logger *logger; bool nested; };
+struct Marker {
+  Logger *logger;
+  bool nested;
+};
 template <> struct std::formatter<Marker> {
   constexpr auto parse(std::format_parse_context &c) { return c.begin(); }
   auto format(const Marker &v, std::format_context &c) const {
-    if (!v.nested) CHECK(v.logger->write<Level::Info>("inner {}", Marker{v.logger, true}));
+    if (!v.nested)
+      CHECK(v.logger->write<Level::Info>("inner {}", Marker{v.logger, true}));
     return std::format_to(c.out(), "{}", v.nested ? "NESTED" : "OUTER");
   }
 };
@@ -192,7 +211,9 @@ void limits_test() {
   CHECK(logger.add_sink(std::move(gate)));
   put(logger, "gate");
   CHECK(control->entered.try_acquire_for(5s));
-  put(logger, "AA"); put(logger, "BB"); put(logger, "CC");
+  put(logger, "AA");
+  put(logger, "BB");
+  put(logger, "CC");
   CHECK(logger.statistics().queued_bytes == 4);
   CHECK(logger.dropped_count() == 1);
   CHECK(!logger.write<Level::Info>("{:10000}", 1));
@@ -210,7 +231,10 @@ void config_test() {
   CHECK(logger.configure(invalid).error().code == ErrorCode::InvalidConfig);
   CHECK(logger.get_level() == Level::Info);
   int calls = 0;
-  CHECK(!logger.lazy(Level::Debug, [&] { ++calls; return "unused"; }));
+  CHECK(!logger.lazy(Level::Debug, [&] {
+    ++calls;
+    return "unused";
+  }));
   CHECK(calls == 0);
   auto data = std::make_shared<Shared>();
   auto sink = std::make_unique<Capture>(data);
@@ -269,17 +293,24 @@ void io_test() {
 }
 
 void rotation_test() {
-  const auto root = std::filesystem::current_path() /
+  const auto root =
+      std::filesystem::current_path() /
       ("rotation-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
   CHECK(std::filesystem::create_directory(root));
   struct Cleanup {
     std::filesystem::path path;
-    ~Cleanup() { std::error_code ec; std::filesystem::remove_all(path, ec); }
+    ~Cleanup() {
+      std::error_code ec;
+      std::filesystem::remove_all(path, ec);
+    }
   } cleanup{root};
   const auto path = root / "test.log";
   {
     RotatingFile file(path, 4, 2);
-    file.write("AAAA"); file.write("BB"); file.write("CCCC"); file.write("DD");
+    file.write("AAAA");
+    file.write("BB");
+    file.write("CCCC");
+    file.write("DD");
     file.flush();
   }
   CHECK(read_file(path) == "DD");
@@ -287,23 +318,32 @@ void rotation_test() {
   CHECK(read_file(path.string() + ".2") == "BB");
   {
     RotatingFile file(root / "no-backups.log", 4, 0);
-    file.write("AAAA"); file.write("BB");
+    file.write("AAAA");
+    file.write("BB");
   }
   CHECK(read_file(root / "no-backups.log") == "BB");
   {
     RotatingFile file(root / "oversized.log", 2, 1);
-    file.write("oversized"); file.write("N");
+    file.write("oversized");
+    file.write("N");
   }
   CHECK(read_file(root / "oversized.log.1") == "oversized");
   CHECK(read_file(root / "oversized.log") == "N");
   const auto blocked = root / "blocked.log";
   CHECK(std::filesystem::create_directory(root / "blocked.log.1"));
-  { std::ofstream keep(root / "blocked.log.1" / "keep"); keep << "nonempty"; }
+  {
+    std::ofstream keep(root / "blocked.log.1" / "keep");
+    keep << "nonempty";
+  }
   {
     RotatingFile file(blocked, 1, 1);
     file.write("A");
     bool failed = false;
-    try { file.write("B"); } catch (const std::system_error &) { failed = true; }
+    try {
+      file.write("B");
+    } catch (const std::system_error &) {
+      failed = true;
+    }
     CHECK(failed);
   }
   CHECK(read_file(blocked) == "A");
@@ -317,9 +357,16 @@ void json_test() {
     LogMessage record;
     record.time = std::chrono::system_clock::time_point{} - 1ms;
     record.text = "original\n\"\\";
-    record.fields = {{"message", "user value"}, {"same", 1}, {"same", 2},
-        {"unicode", "Привет"}, {"invalid", std::string("\xff", 1)},
-        {"flag", true}, {"nan", (std::numeric_limits<double>::quiet_NaN)()}};
+    record.fields = {{"message", "user value"},
+                     {"same", 1},
+                     {"same", 2},
+                     {"unicode", "Привет"},
+                     {"invalid", std::string("\xff", 1)},
+                     {"flag", true},
+                     {"nan", (std::numeric_limits<double>::quiet_NaN)()},
+                     {std::string("\xff", 1), 1},
+                     {std::string("\xfe", 1), 2},
+                     {"\xef\xbf\xbd", 3}};
     sink.write(record);
     sink.flush();
   }
@@ -329,6 +376,7 @@ void json_test() {
   CHECK(json.find("\"same\":1") == std::string::npos);
   CHECK(json.find("\"invalid\":\"\\ufffd\"") != std::string::npos);
   CHECK(json.find("\"flag\":true,\"nan\":null") != std::string::npos);
+  CHECK(json.find("\"\xef\xbf\xbd\":3") != std::string::npos);
 }
 
 void console_test() {
@@ -356,17 +404,101 @@ void console_test() {
   CHECK(read_file(path) == "[INF] hello {user_id=42}\n");
 #endif
 }
+
+void model_test() {
+  Logger logger(async_config(1));
+  auto data = std::make_shared<Shared>();
+  auto gate = std::make_unique<Gate>(data);
+  auto *control = gate.get();
+  CHECK(logger.add_sink(std::move(gate)));
+  put(logger, "gate");
+  CHECK(control->entered.try_acquire_for(5s));
+  std::deque<std::string> model;
+  size_t capacity = 1;
+  uint64_t dropped = 0;
+  std::mt19937 random(42);
+  for (int i = 0; i < 1000; ++i) {
+    if (random() % 4 == 0) {
+      capacity = random() % 16 + 1;
+      CHECK(logger.set_queue_capacity(capacity));
+    } else {
+      const auto text = std::to_string(i);
+      put(logger, text);
+      model.push_back(text);
+    }
+    while (model.size() > capacity) {
+      model.pop_front();
+      ++dropped;
+    }
+  }
+  control->release.release();
+  CHECK(logger.shutdown());
+  CHECK(data->records.size() == model.size() + 1);
+  for (size_t i = 0; i < model.size(); ++i)
+    CHECK(data->records[i + 1].text == model[i]);
+  CHECK(logger.dropped_count() == dropped);
+}
+
+void busy_flush_test() {
+  Logger logger(async_config(64));
+  auto data = std::make_shared<Shared>();
+  CHECK(logger.add_sink(std::make_unique<Capture>(data)));
+  std::jthread producer([&] {
+    for (int i = 0; i < 20000; ++i)
+      CHECK(logger.write<Level::Info>("{}", i));
+  });
+  std::jthread flush_a([&] {
+    for (int i = 0; i < 25; ++i)
+      CHECK(logger.flush());
+  });
+  std::jthread flush_b([&] {
+    for (int i = 0; i < 25; ++i)
+      CHECK(logger.flush());
+  });
+  producer.join();
+  flush_a.join();
+  flush_b.join();
+  CHECK(logger.shutdown());
+  const auto stats = logger.statistics();
+  CHECK(stats.accepted == 20000);
+  CHECK(stats.accepted == stats.processed + stats.dropped);
+  CHECK(stats.queued == 0 && stats.queued_bytes == 0);
+}
 int main(int argc, char **argv) {
-  if (argc != 2) return 2;
+  if (argc != 2)
+    return 2;
   try {
     const std::string_view test = argv[1];
-    if (test == "ring" || test == "drop_newest" || test == "resize") queue_test(test);
-    else if (test == "flush") flush_test(); else if (test == "shutdown") shutdown_test();
-    else if (test == "reentrant") reentrant_test(); else if (test == "formatting") formatting_test();
-    else if (test == "limits") limits_test(); else if (test == "config") config_test();
-    else if (test == "timer") timer_test(); else if (test == "io") io_test();
-    else if (test == "rotation") rotation_test(); else if (test == "json") json_test();
-    else if (test == "console") console_test(); else return 2;
+    if (test == "ring" || test == "drop_newest" || test == "resize")
+      queue_test(test);
+    else if (test == "flush")
+      flush_test();
+    else if (test == "shutdown")
+      shutdown_test();
+    else if (test == "reentrant")
+      reentrant_test();
+    else if (test == "formatting")
+      formatting_test();
+    else if (test == "limits")
+      limits_test();
+    else if (test == "config")
+      config_test();
+    else if (test == "timer")
+      timer_test();
+    else if (test == "io")
+      io_test();
+    else if (test == "rotation")
+      rotation_test();
+    else if (test == "json")
+      json_test();
+    else if (test == "console")
+      console_test();
+    else if (test == "model")
+      model_test();
+    else if (test == "busy_flush")
+      busy_flush_test();
+    else
+      return 2;
     std::cout << "PASS " << test << '\n';
     return 0;
   } catch (const std::exception &error) {

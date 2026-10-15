@@ -6,9 +6,17 @@
 namespace log_core {
 
 enum class ErrorCode {
-  None, InvalidConfig, Stopped, ReentrantCall, ModeAlreadyStarted,
-  AllocationFailed, FormattingFailed, SinkFailure, WorkerStartFailed,
-  RecordTooLarge, TooManyFields,
+  None,
+  InvalidConfig,
+  Stopped,
+  ReentrantCall,
+  ModeAlreadyStarted,
+  AllocationFailed,
+  FormattingFailed,
+  SinkFailure,
+  WorkerStartFailed,
+  RecordTooLarge,
+  TooManyFields,
 };
 struct Error {
   ErrorCode code = ErrorCode::None;
