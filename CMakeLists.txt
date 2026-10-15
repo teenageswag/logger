@@ -7,6 +7,9 @@ target_include_directories(logger INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/logger/
 target_compile_features(logger INTERFACE cxx_std_23)
 option(LOGGER_SANITIZE "Enable MSVC AddressSanitizer" OFF)
 if(MSVC)
+  # CMake's cxx_std_23 mapping otherwise selects /std:c++latest on this toolchain.
+  set(CMAKE_CXX23_STANDARD_COMPILE_OPTION "/std:c++23preview")
+  set(CMAKE_CXX23_EXTENSION_COMPILE_OPTION "/std:c++23preview")
   target_compile_options(logger INTERFACE /W4 /permissive- /utf-8)
   if(LOGGER_SANITIZE)
     string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")

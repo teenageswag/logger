@@ -40,7 +40,9 @@ struct Field {
   Field(std::string k, const char *v) : key(std::move(k)), value(std::string(v ? v : "")) {}
   Field(std::string k, std::string v) : key(std::move(k)), value(std::move(v)) {}
   Field(std::string k, std::string_view v) : key(std::move(k)), value(std::string(v)) {}
-  Field(std::string k, bool v) : key(std::move(k)), value(v) {}
+  template <typename T>
+    requires std::same_as<std::remove_cvref_t<T>, bool>
+  Field(std::string k, T v) : key(std::move(k)), value(v) {}
 
   template <typename T>
     requires(std::is_integral_v<std::remove_cvref_t<T>> &&

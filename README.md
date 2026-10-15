@@ -144,8 +144,9 @@ Library-owned formatting/allocation failures are caught; evaluation of arguments
 and construction of Fields before the call remain the caller's responsibility.
 
 Custom Sink::write/flush exceptions are isolated and counted. Callbacks execute
-serially under the sink lock. Reentrant log/control calls into the same logger
-are rejected. Custom sinks used directly must provide their own synchronization;
+serially under the sink lock. Logging and blocking control operations into the same
+logger are rejected from callbacks; atomic level changes and statistics remain available.
+Custom sinks used directly must provide their own synchronization;
 destructors must not throw. A sink that blocks forever also blocks shutdown.
 
 ## Independent instances and statistics
@@ -160,7 +161,7 @@ auto stats = logger.statistics();
 auto error = logger.last_error();
 ```
 
-Statistics include accepted/processed/dropped/rejected records, per-level drops,
+Statistics include accepted/processed/dropped records, rejected operations, per-level drops,
 sink errors, queue payload bytes and high-water mark. Snapshots during production
 are observational; accounting identities should be checked after shutdown.
 Thread names are UTF-8, limited to 128 bytes at a character boundary.
@@ -179,9 +180,21 @@ The logger/logger_include.h forwarding header is retained.
 ./tests/run.ps1 -Configuration Release
 ./tests/run.ps1 -Configuration Release -Architecture x86
 ./tests/run.ps1 -Configuration Release -Sanitize
+./tests/run.ps1 -Configuration Release -Benchmarks
 ```
 
 CMake exposes an INTERFACE logger target. The test runner uses VS 2026 Build Tools.
 Tests cover queue overflow/resize, delivery barriers, shutdown, reentrancy,
 formatting failures, payload limits, idle flush, sink failures, rotation, JSON,
 redirected console output and multiple translation units.
+The DLL tests include existing host threads, late static destruction and a hidden
+logger-owned console that must disappear when its DLL unloads. CMake also verifies
+that an invalid format specifier fails compilation.
+The reproducible local results are in [benchmarks/README.md](benchmarks/README.md).
+
+## Migration from the previous version
+
+- Logging defaults to synchronous output; choose Mode::Asynchronous explicitly.
+- Configure sinks explicitly and inspect returned results.
+- Compile-time filtering uses LOG_* macros; ordinary functions use runtime filtering.
+- JSON user properties now live inside fields and timestamps use UTC.

@@ -7,6 +7,7 @@ int disabled_callsite();
 int enabled_callsite();
 struct Unsupported {};
 static_assert(!std::constructible_from<log::Field, std::string, Unsupported>);
+static_assert(!std::constructible_from<log::Field, std::string, int *>);
 struct Capture final : log::Sink {
   std::vector<log_core::LogMessage> messages;
   void write(const log_core::LogMessage &message) override { messages.push_back(message); }

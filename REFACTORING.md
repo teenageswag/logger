@@ -20,10 +20,12 @@
 
 ## Validation
 
-- 20 tests pass in Debug x64, Release x64/x86 and Release x64 AddressSanitizer.
+- 20 tests pass in Debug x64, Release x64/x86 and Release x64 AddressSanitizer,
+  using the explicit MSVC C++23 preview switch.
 - DLL tests cover 50 load/unload cycles plus three hidden owned-console cycles per run.
 - Compile checks accept a valid format and reject a mismatched format specifier.
 - Original Visual Studio solution builds after removal of implementation sources.
+- Raw benchmark results and methodology are saved in benchmarks/.
 - Benchmark measures 1/2/8 producers, 32/256/4096-byte records, fields, disabled
   logging, null/file/JSON sinks, latency percentiles, throughput and drops.
 
