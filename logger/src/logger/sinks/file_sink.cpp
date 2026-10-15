@@ -5,7 +5,7 @@
 
 namespace log_core {
 
-FileSink::FileSink(std::filesystem::path path, size_t max_size,
+FileSink::FileSink(std::filesystem::path path, uint64_t max_size,
                    size_t max_files,
                    std::chrono::milliseconds flush_interval)
     : file_(std::move(path), max_size, max_files),
@@ -20,8 +20,7 @@ void FileSink::write(const LogMessage &message) {
                                     std::format(" [{}]", message.thread_name),
       message.text, format_fields(message.fields));
 
-  if (!file_.write(formatted))
-    return;
+  file_.write(formatted);
 
   const auto now = std::chrono::steady_clock::now();
   if (now - last_flush_ >= flush_interval_) {

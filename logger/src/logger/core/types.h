@@ -1,6 +1,9 @@
 #pragma once
 
 #include <chrono>
+#include <concepts>
+#include <cstddef>
+#include <stdexcept>
 #include <cstdint>
 #include <ctime>
 #include <format>
@@ -58,7 +61,7 @@ struct Field {
              !std::is_same_v<std::remove_cvref_t<T>, char *> &&
              !std::is_same_v<std::remove_cvref_t<T>, std::string> &&
              !std::is_same_v<std::remove_cvref_t<T>, std::string_view> &&
-             requires(const T &v) { std::format("{}", v); })
+             std::formattable<const T &, char>)
   Field(std::string k, const T &v)
       : key(std::move(k)), value(std::format("{}", v)) {}
 
@@ -182,7 +185,7 @@ inline constexpr std::string_view reset_color = "\x1b[0m";
 
 inline bool get_time_info(std::chrono::system_clock::time_point tp,
                           struct tm &tm_info) noexcept {
-  const auto time = std::chrono::system_clock::to_time_t(tp);
+  const auto time = std::chrono::system_clock::to_time_t(std::chrono::floor<std::chrono::seconds>(tp));
 #if defined(_WIN32)
   return localtime_s(&tm_info, &time) == 0;
 #else
@@ -190,52 +193,49 @@ inline bool get_time_info(std::chrono::system_clock::time_point tp,
 #endif
 }
 
+inline std::tm checked_local_time(std::chrono::system_clock::time_point tp) {
+  std::tm result{};
+  if (!get_time_info(tp, result)) throw std::range_error("log timestamp outside localtime range");
+  return result;
+}
+
+inline auto milliseconds_part(std::chrono::system_clock::time_point tp) noexcept {
+  return (std::chrono::floor<std::chrono::milliseconds>(tp) -
+          std::chrono::floor<std::chrono::seconds>(tp)).count();
+}
+
 inline std::string format_date(std::chrono::system_clock::time_point tp) {
-  struct tm tm_info {};
-  get_time_info(tp, tm_info);
-  return std::format("{:04}-{:02}-{:02}", tm_info.tm_year + 1900,
-                     tm_info.tm_mon + 1, tm_info.tm_mday);
+  const auto tm = checked_local_time(tp);
+  return std::format("{:04}-{:02}-{:02}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
 }
 
 inline std::string format_time(std::chrono::system_clock::time_point tp,
                                bool with_milliseconds = true) {
-  struct tm tm_info {};
-  get_time_info(tp, tm_info);
-  const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                      tp.time_since_epoch()) %
-                  1000;
-  if (with_milliseconds) {
-    return std::format("{:02}:{:02}:{:02}:{:03}", tm_info.tm_hour,
-                       tm_info.tm_min, tm_info.tm_sec, ms.count());
-  }
-  return std::format("{:02}:{:02}:{:02}", tm_info.tm_hour, tm_info.tm_min,
-                     tm_info.tm_sec);
+  const auto tm = checked_local_time(tp);
+  if (with_milliseconds)
+    return std::format("{:02}:{:02}:{:02}:{:03}", tm.tm_hour, tm.tm_min, tm.tm_sec,
+                       milliseconds_part(tp));
+  return std::format("{:02}:{:02}:{:02}", tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
 
-inline std::string format_timestamp(
-    std::chrono::system_clock::time_point tp) {
-  struct tm tm_info {};
-  get_time_info(tp, tm_info);
-  const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                      tp.time_since_epoch()) %
-                  1000;
+inline std::string format_timestamp(std::chrono::system_clock::time_point tp) {
+  const auto tm = checked_local_time(tp);
   return std::format("{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:03}",
-                     tm_info.tm_year + 1900, tm_info.tm_mon + 1,
-                     tm_info.tm_mday, tm_info.tm_hour, tm_info.tm_min,
-                     tm_info.tm_sec, ms.count());
+      tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+      milliseconds_part(tp));
 }
 
-inline std::string format_iso_timestamp(
-    std::chrono::system_clock::time_point tp) {
-  struct tm tm_info {};
-  get_time_info(tp, tm_info);
-  const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                      tp.time_since_epoch()) %
-                  1000;
-  return std::format("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}",
-                     tm_info.tm_year + 1900, tm_info.tm_mon + 1,
-                     tm_info.tm_mday, tm_info.tm_hour, tm_info.tm_min,
-                     tm_info.tm_sec, ms.count());
+inline std::string format_iso_timestamp(std::chrono::system_clock::time_point tp) {
+  using namespace std::chrono;
+  // Calendar arithmetic handles pre-epoch timestamps without the CRT localtime limits.
+  const auto ms = floor<milliseconds>(tp.time_since_epoch());
+  const auto day = floor<days>(ms);
+  const year_month_day date{sys_days{day}};
+  const hh_mm_ss time{ms - day};
+  return std::format("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+      static_cast<int>(date.year()), static_cast<unsigned>(date.month()),
+      static_cast<unsigned>(date.day()), time.hours().count(), time.minutes().count(),
+      time.seconds().count(), time.subseconds().count());
 }
 
 inline std::string_view shorten_filename(std::string_view filename) noexcept {

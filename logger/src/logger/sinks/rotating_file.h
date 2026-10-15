@@ -1,143 +1,90 @@
 #pragma once
 
 #include <algorithm>
-#include <cstddef>
+#include <cerrno>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <limits>
+#include <stdexcept>
+#include <string>
 #include <string_view>
 #include <system_error>
 #include <utility>
 
 namespace log_core {
 
+// One writer owns the active path and all its backups.
 class RotatingFile {
 public:
-  RotatingFile(std::filesystem::path path, size_t max_size,
-               size_t max_files)
+  RotatingFile(std::filesystem::path path, uint64_t max_size, size_t max_files)
       : path_(std::move(path)), max_size_(max_size), max_files_(max_files) {
+    if (path_.empty()) throw std::invalid_argument("empty log path");
+    file_.exceptions(std::ios::badbit | std::ios::failbit);
     open_file();
   }
-
   RotatingFile(const RotatingFile &) = delete;
   RotatingFile &operator=(const RotatingFile &) = delete;
-
-  ~RotatingFile() {
-    if (file_.is_open())
-      file_.close();
-  }
 
   bool is_open() const noexcept { return file_.is_open(); }
 
   bool write(std::string_view data) {
-    if (!file_.is_open())
-      return false;
-
-    // A zero limit disables size-based rotation. A single oversized record is
-    // written to an empty file instead of causing a rotate loop.
-    if (max_size_ != 0 && current_size_ != 0 &&
-        data.size() > max_size_ - (std::min)(current_size_, max_size_)) {
-      if (!rotate())
-        return false;
+    if (max_size_ && current_size_ &&
+        data.size() > max_size_ - (std::min)(current_size_, max_size_)) rotate();
+    while (!data.empty()) {
+      const auto size = (std::min)(data.size(),
+          static_cast<size_t>((std::numeric_limits<std::streamsize>::max)()));
+      file_.write(data.data(), static_cast<std::streamsize>(size));
+      if (size > (std::numeric_limits<uint64_t>::max)() - current_size_)
+        throw std::overflow_error("log file size overflow");
+      current_size_ += size;
+      data.remove_prefix(size);
     }
-
-    file_.write(data.data(), static_cast<std::streamsize>(data.size()));
-    if (!file_)
-      return false;
-    current_size_ += data.size();
     return true;
   }
-
-  void flush() {
-    if (file_.is_open())
-      file_.flush();
-  }
+  void flush() { file_.flush(); }
 
 private:
-  bool open_file() {
-    std::error_code ec;
+  void open_file(bool truncate = false) {
     if (const auto parent = path_.parent_path(); !parent.empty())
-      std::filesystem::create_directories(parent, ec);
-
+      std::filesystem::create_directories(parent);
     file_.clear();
-    file_.open(path_, std::ios::out | std::ios::app | std::ios::binary);
-    if (!file_.is_open())
-      return false;
-
-    file_.seekp(0, std::ios::end);
-    const auto position = file_.tellp();
-    if (position < 0) {
-      current_size_ = 0;
-      return true;
+    errno = 0;
+    try {
+      file_.open(path_, std::ios::out | std::ios::binary |
+                        (truncate ? std::ios::trunc : std::ios::app));
+    } catch (const std::ios_base::failure &) {
+      throw std::system_error(errno ? std::error_code(errno, std::generic_category()) :
+          std::make_error_code(std::errc::io_error), "open log file");
     }
-    current_size_ = static_cast<size_t>(position);
-    return true;
+    current_size_ = std::filesystem::file_size(path_);
   }
-
-  bool rotate() {
-    if (max_files_ == 0)
-      return true;
-
-    if (file_.is_open())
-      file_.close();
-
-    std::error_code ec;
-    auto backup = [this](size_t index) {
-      auto path = path_;
-      path += "." + std::to_string(index);
-      return path;
-    };
-
-    const auto oldest = backup(max_files_);
-    std::filesystem::remove(oldest, ec);
-    if (ec && ec != std::errc::no_such_file_or_directory) {
+  std::filesystem::path backup(size_t index) const {
+    auto result = path_;
+    result += "." + std::to_string(index);
+    return result;
+  }
+  void rotate() {
+    file_.close(); // Detect flush/close failures before renaming.
+    try {
+      if (max_files_ == 0) { open_file(true); return; }
+      std::filesystem::remove(backup(max_files_));
+      for (size_t i = max_files_; i > 1; --i)
+        if (std::filesystem::exists(backup(i - 1)))
+          std::filesystem::rename(backup(i - 1), backup(i));
+      std::filesystem::rename(path_, backup(1));
       open_file();
-      return false;
+    } catch (...) {
+      // Preserve the original error; later records can retry after recovery.
+      if (!file_.is_open()) { try { open_file(); } catch (...) {} }
+      throw;
     }
-
-    for (size_t i = max_files_; i > 1; --i) {
-      const auto source = backup(i - 1);
-      const auto destination = backup(i);
-      ec.clear();
-      if (!std::filesystem::exists(source, ec)) {
-        if (ec) {
-          open_file();
-          return false;
-        }
-        continue;
-      }
-      std::filesystem::rename(source, destination, ec);
-      if (ec) {
-        open_file();
-        return false;
-      }
-    }
-
-    ec.clear();
-    if (std::filesystem::exists(path_, ec)) {
-      if (ec)
-        {
-          open_file();
-          return false;
-        }
-      std::filesystem::rename(path_, backup(1), ec);
-      if (ec)
-        {
-          open_file();
-          return false;
-        }
-    } else if (ec) {
-      open_file();
-      return false;
-    }
-
-    return open_file();
   }
 
   std::filesystem::path path_;
   std::ofstream file_;
-  size_t max_size_ = 0;
+  uint64_t max_size_ = 0, current_size_ = 0;
   size_t max_files_ = 0;
-  size_t current_size_ = 0;
 };
 
 } // namespace log_core

@@ -22,6 +22,7 @@ struct ConsoleSinkConfig {
   bool enable_backgrounds = false;
   bool force_ansi = false;
   bool free_owned_console = true;
+  bool modify_host_console = false;
   bool show_date = true;
   bool show_time = true;
   bool show_file = true;
@@ -45,7 +46,10 @@ public:
 private:
   ConsoleSinkConfig config_;
   bool owns_console_ = false;
-  bool ansi_enabled_ = false;
+  bool stdout_ansi_ = false, stderr_ansi_ = false;
+  bool used_stdout_ = false, used_stderr_ = false;
+  std::string buffer_;
+  void release() noexcept;
 
 #if defined(_WIN32)
   void *stdout_handle_ = nullptr;

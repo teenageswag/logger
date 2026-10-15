@@ -1,4 +1,9 @@
-#include "logger/core/logger.h"
+#include "logger/logger.h"
+#include <fstream>
+#include <limits>
+#if defined(_WIN32)
+#include <io.h>
+#endif
 #include <iostream>
 #include <semaphore>
 #include <stdexcept>
@@ -162,9 +167,8 @@ template <> struct std::formatter<Marker> {
 struct Throwing {};
 template <> struct std::formatter<Throwing> {
   constexpr auto parse(std::format_parse_context &c) { return c.begin(); }
-  auto format(const Throwing &, std::format_context &c) const {
+  auto format(const Throwing &, std::format_context &) const -> std::format_context::iterator {
     throw std::runtime_error("formatter failed");
-    return c.out();
   }
 };
 void formatting_test() {
@@ -233,6 +237,125 @@ void timer_test() {
   CHECK(logger.shutdown());
   CHECK(data->records.size() == 1);
 }
+
+std::string read_file(const std::filesystem::path &path) {
+  std::ifstream input(path, std::ios::binary);
+  CHECK(input.is_open());
+  return {(std::istreambuf_iterator<char>(input)), {}};
+}
+
+struct FailedSink : Sink {
+  void write(const LogMessage &) override {
+    throw std::system_error(std::make_error_code(std::errc::no_space_on_device));
+  }
+  void flush() override { throw std::runtime_error("flush failure"); }
+};
+
+void io_test() {
+  const auto result = log::add_file_sink(".");
+  CHECK(!result && result.error().code == ErrorCode::SinkFailure);
+  CHECK(result.error().system);
+  CHECK(!log::add_json_sink("."));
+  CHECK(log::add_file_sink("").error().code == ErrorCode::InvalidConfig);
+  Logger logger;
+  auto data = std::make_shared<Shared>();
+  CHECK(logger.add_sink(std::make_unique<FailedSink>()));
+  CHECK(logger.add_sink(std::make_unique<Capture>(data)));
+  CHECK(!logger.write<Level::Info>("still reaches healthy sink"));
+  CHECK(logger.sink_error_count() == 2);
+  CHECK(!logger.flush());
+  check_text(*data, {"still reaches healthy sink"});
+  CHECK(!logger.shutdown());
+}
+
+void rotation_test() {
+  const auto root = std::filesystem::current_path() /
+      ("rotation-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+  CHECK(std::filesystem::create_directory(root));
+  struct Cleanup {
+    std::filesystem::path path;
+    ~Cleanup() { std::error_code ec; std::filesystem::remove_all(path, ec); }
+  } cleanup{root};
+  const auto path = root / "test.log";
+  {
+    RotatingFile file(path, 4, 2);
+    file.write("AAAA"); file.write("BB"); file.write("CCCC"); file.write("DD");
+    file.flush();
+  }
+  CHECK(read_file(path) == "DD");
+  CHECK(read_file(path.string() + ".1") == "CCCC");
+  CHECK(read_file(path.string() + ".2") == "BB");
+  {
+    RotatingFile file(root / "no-backups.log", 4, 0);
+    file.write("AAAA"); file.write("BB");
+  }
+  CHECK(read_file(root / "no-backups.log") == "BB");
+  {
+    RotatingFile file(root / "oversized.log", 2, 1);
+    file.write("oversized"); file.write("N");
+  }
+  CHECK(read_file(root / "oversized.log.1") == "oversized");
+  CHECK(read_file(root / "oversized.log") == "N");
+  const auto blocked = root / "blocked.log";
+  CHECK(std::filesystem::create_directory(root / "blocked.log.1"));
+  { std::ofstream keep(root / "blocked.log.1" / "keep"); keep << "nonempty"; }
+  {
+    RotatingFile file(blocked, 1, 1);
+    file.write("A");
+    bool failed = false;
+    try { file.write("B"); } catch (const std::system_error &) { failed = true; }
+    CHECK(failed);
+  }
+  CHECK(read_file(blocked) == "A");
+}
+
+void json_test() {
+  const auto path = std::filesystem::current_path() / "sink-fixture.jsonl";
+  std::filesystem::remove(path);
+  {
+    JsonSink sink({path, 0, 0});
+    LogMessage record;
+    record.time = std::chrono::system_clock::time_point{} - 1ms;
+    record.text = "original\n\"\\";
+    record.fields = {{"message", "user value"}, {"same", 1}, {"same", 2},
+        {"unicode", "Привет"}, {"invalid", std::string("\xff", 1)},
+        {"flag", true}, {"nan", (std::numeric_limits<double>::quiet_NaN)()}};
+    sink.write(record);
+    sink.flush();
+  }
+  const auto json = read_file(path);
+  CHECK(json.find("1969-12-31T23:59:59.999Z") != std::string::npos);
+  CHECK(json.find("\"fields\":{\"message\":\"user value\",\"same\":2,") != std::string::npos);
+  CHECK(json.find("\"same\":1") == std::string::npos);
+  CHECK(json.find("\"invalid\":\"\\ufffd\"") != std::string::npos);
+  CHECK(json.find("\"flag\":true,\"nan\":null") != std::string::npos);
+}
+
+void console_test() {
+#if defined(_WIN32)
+  const auto path = std::filesystem::current_path() / "console-fixture.txt";
+  const int saved = _dup(_fileno(stdout));
+  CHECK(saved >= 0);
+  FILE *stream = nullptr;
+  CHECK(freopen_s(&stream, path.string().c_str(), "wb", stdout) == 0);
+  ConsoleSinkConfig config;
+  config.auto_alloc = false;
+  config.enable_colors = false;
+  config.show_date = config.show_time = config.show_file = false;
+  {
+    ConsoleSink sink(config);
+    LogMessage record;
+    record.text = "hello";
+    record.fields = {{"user_id", 42}};
+    sink.write(record);
+    sink.flush();
+    CHECK(std::filesystem::file_size(path) > 0);
+  }
+  CHECK(_dup2(saved, _fileno(stdout)) == 0);
+  CHECK(_close(saved) == 0);
+  CHECK(read_file(path) == "[INF] hello {user_id=42}\n");
+#endif
+}
 int main(int argc, char **argv) {
   if (argc != 2) return 2;
   try {
@@ -241,7 +364,9 @@ int main(int argc, char **argv) {
     else if (test == "flush") flush_test(); else if (test == "shutdown") shutdown_test();
     else if (test == "reentrant") reentrant_test(); else if (test == "formatting") formatting_test();
     else if (test == "limits") limits_test(); else if (test == "config") config_test();
-    else if (test == "timer") timer_test(); else return 2;
+    else if (test == "timer") timer_test(); else if (test == "io") io_test();
+    else if (test == "rotation") rotation_test(); else if (test == "json") json_test();
+    else if (test == "console") console_test(); else return 2;
     std::cout << "PASS " << test << '\n';
     return 0;
   } catch (const std::exception &error) {

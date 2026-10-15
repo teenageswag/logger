@@ -166,6 +166,8 @@ Result Logger::init_console(ConsoleSinkConfig config) {
     return std::unexpected(Error{ErrorCode::SinkFailure, e.code()});
   } catch (const std::bad_alloc &) {
     return std::unexpected(Error{ErrorCode::AllocationFailed, {}});
+  } catch (const std::invalid_argument &) {
+    return std::unexpected(Error{ErrorCode::InvalidConfig, {}});
   }
 }
 

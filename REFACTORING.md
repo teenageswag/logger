@@ -14,6 +14,6 @@
 ## Work
 
 - [x] Runtime: lifecycle, ring invariants, flush barrier, exceptions and regression tests.
-- [ ] Sinks: I/O errors, console ownership/encoding/fields, JSON, timestamps, rotation.
+- [x] Sinks: I/O errors, console ownership/encoding/fields, JSON, timestamps, rotation.
 - [ ] Packaging/API: header-only, symmetrical fields, lazy/compile-time filtering.
 - [ ] Verification: DLL host, multiple TUs, configurations, benchmarks, documentation.

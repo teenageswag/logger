@@ -35,11 +35,11 @@ struct log {
     auto *p = get(); return p ? p->add_sink(std::move(sink)) : stopped();
   }
   static Result add_file_sink(const std::filesystem::path &path,
-                             size_t max_size = 5 * 1024 * 1024, size_t max_files = 1) {
+                             uint64_t max_size = 5 * 1024 * 1024, size_t max_files = 1) {
     return make_sink<log_core::FileSink>(path, max_size, max_files);
   }
   static Result add_json_sink(const std::filesystem::path &path,
-                             size_t max_size = 10 * 1024 * 1024, size_t max_files = 3) {
+                             uint64_t max_size = 10 * 1024 * 1024, size_t max_files = 3) {
     return make_sink<log_core::JsonSink>(log_core::JsonSinkConfig{path, max_size, max_files});
   }
   static Result add_console_sink(ConsoleConfig config = {}) {
@@ -199,6 +199,8 @@ private:
       return std::unexpected(Error{ErrorCode::SinkFailure, e.code()});
     } catch (const std::bad_alloc &) {
       return std::unexpected(Error{ErrorCode::AllocationFailed, {}});
+    } catch (const std::invalid_argument &) {
+      return std::unexpected(Error{ErrorCode::InvalidConfig, {}});
     }
   }
 };

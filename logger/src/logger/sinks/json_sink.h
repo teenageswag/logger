@@ -9,7 +9,7 @@ namespace log_core {
 
 struct JsonSinkConfig {
   std::filesystem::path path;
-  size_t max_size = 10 * 1024 * 1024;
+  uint64_t max_size = 10 * 1024 * 1024;
   size_t max_files = 3;
 };
 
@@ -22,6 +22,7 @@ public:
 
 private:
   RotatingFile file_;
+  std::string buffer_;
 };
 
 } // namespace log_core

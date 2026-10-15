@@ -11,7 +11,7 @@ namespace log_core {
 class FileSink final : public Sink {
 public:
   explicit FileSink(
-      std::filesystem::path path, size_t max_size = 5 * 1024 * 1024,
+      std::filesystem::path path, uint64_t max_size = 5 * 1024 * 1024,
       size_t max_files = 1,
       std::chrono::milliseconds flush_interval =
           std::chrono::milliseconds(1000));
