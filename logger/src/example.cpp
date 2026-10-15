@@ -18,7 +18,7 @@ int main() {
   log::Config logger_cfg;
   logger_cfg.only_in_debug_build = true;
   logger_cfg.level = log::Level::Trace;
-  log::configure(logger_cfg);
+  if (!log::configure(logger_cfg)) return 1;
 
   // --- Console setup ---
   log::ConsoleConfig cfg;
@@ -30,13 +30,13 @@ int main() {
   cfg.show_time = true;
   cfg.show_file = true;
   cfg.time_format = log::ConsoleConfig::TimeFormat::WithMilliseconds;
-  log::init_console(cfg);
+  if (!log::init_console(cfg)) return 1;
 
   // --- File sink with 3 rotation backups ---
-  log::add_file_sink("app.log", 1 * 1024 * 1024, 3);
+  if (!log::add_file_sink("app.log", 1 * 1024 * 1024, 3)) return 1;
 
   // --- JSON sink for structured log aggregation ---
-  log::add_json_sink("logs.json", 5 * 1024 * 1024, 3);
+  if (!log::add_json_sink("logs.json", 5 * 1024 * 1024, 3)) return 1;
 
   // --- Basic logging ---
   log::trace("This is a trace message");

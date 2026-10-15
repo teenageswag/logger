@@ -40,6 +40,7 @@ public:
 
   void write(const LogMessage &message) override;
   void flush() override;
+  bool is_console() const noexcept override { return true; }
 
 private:
   ConsoleSinkConfig config_;

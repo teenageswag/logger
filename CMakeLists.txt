@@ -1,0 +1,26 @@
+cmake_minimum_required(VERSION 3.25)
+project(logger LANGUAGES CXX)
+add_library(logger STATIC
+  logger/src/logger/core/logger.cpp
+  logger/src/logger/sinks/console_sink.cpp
+  logger/src/logger/sinks/file_sink.cpp
+  logger/src/logger/sinks/json_sink.cpp)
+target_include_directories(logger PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/logger/src")
+target_compile_features(logger PUBLIC cxx_std_23)
+if(MSVC)
+  target_compile_options(logger PUBLIC /W4 /permissive- /utf-8)
+endif()
+option(LOGGER_BUILD_EXAMPLE "Build the interactive example" ON)
+if(LOGGER_BUILD_EXAMPLE)
+  add_executable(logger_example logger/src/example.cpp)
+  target_link_libraries(logger_example PRIVATE logger)
+endif()
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(logger_tests tests/logger_tests.cpp)
+  target_link_libraries(logger_tests PRIVATE logger)
+  foreach(case ring drop_newest resize flush shutdown reentrant formatting limits config timer)
+    add_test(NAME logger.${case} COMMAND logger_tests ${case})
+    set_tests_properties(logger.${case} PROPERTIES TIMEOUT 30)
+  endforeach()
+endif()

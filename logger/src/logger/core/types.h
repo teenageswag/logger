@@ -24,6 +24,7 @@ enum class Level : uint8_t {
   Warn,
   Error,
   Critical,
+  Off,
 };
 
 using FieldValue =
@@ -99,6 +100,8 @@ struct LogMessage {
   std::source_location loc;
   std::string text;
   std::vector<Field> fields;
+  uint64_t sequence = 0;
+  size_t payload_bytes = 0;
 
   // Compatibility name used by older sink implementations.
   std::vector<Field> &kv_pairs() { return fields; }
@@ -125,6 +128,8 @@ inline std::string_view level_to_string(Level level) noexcept {
     return "ERR";
   case Level::Critical:
     return "CRT";
+  case Level::Off:
+    return "OFF";
   }
   return "UNK";
 }
@@ -145,6 +150,8 @@ inline std::string_view level_to_color(Level level) noexcept {
     return "\x1b[38;2;248;113;113m";
   case Level::Critical:
     return "\x1b[38;2;255;153;153m";
+  case Level::Off:
+    break;
   }
   return "\x1b[0m";
 }
@@ -165,6 +172,8 @@ inline std::string_view level_to_background_color(Level level) noexcept {
     return "\x1b[48;2;127;29;29m";
   case Level::Critical:
     return "\x1b[48;2;153;27;27m";
+  case Level::Off:
+    break;
   }
   return "\x1b[0m";
 }
